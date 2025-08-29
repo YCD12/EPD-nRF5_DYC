@@ -30,7 +30,7 @@
 
 本项目自带一个基于浏览器蓝牙接口实现的网页版上位机，可使用手机或电脑打开下面地址使用，或者在本地直接双击打开 `html/index.html` 来使用。
 
-- 地址：https://github.com/YCD12/EPD-nRF5_DYC
+- 地址：https://ycd12.github.io/EPD-nRF5_DYC/
 - 演示：https://www.bilibili.com/video/BV1KWAVe1EKs
 - 交流群: [389017618](https://qm.qq.com/q/SckzhfDxuu) (点击链接加入群聊)
 

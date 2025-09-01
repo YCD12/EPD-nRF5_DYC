@@ -368,9 +368,10 @@ async function connect() {
   if (appVersion < 0x16) {
     const oldURL = "https://tsl0922.github.io/EPD-nRF5/v1.5";
     alert("!!!注意!!!\n当前固件版本过低，可能无法正常使用部分功能，建议升级到最新版本。");
-    if (confirm('是否访问旧版本上位机？')) location.href = oldURL;
+    // if (confirm('是否访问旧版本上位机？')) location.href = oldURL;
     setTimeout(() => {
-      addLog(`如遇到问题，可访问旧版本上位机: ${oldURL}`);
+    //   addLog(`如遇到问题，可访问旧版本上位机: ${oldURL}`);
+    addLog(`如遇到问题，请联系购买商家`);
     }, 500);
   }
 

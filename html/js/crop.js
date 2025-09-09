@@ -15,27 +15,23 @@ function resetCropStates() {
   lastPanY = 0;
 }
 
-function removeEventListeners() {
+function isCropMode() {
+  return canvas.parentNode.classList.contains('crop-mode');
+}
+
+function exitCropMode() {
+  canvas.parentNode.classList.remove('crop-mode');
+  setCanvasTitle("");
+
   canvas.removeEventListener('wheel', handleBackgroundZoom);
   canvas.removeEventListener('mousedown', handleBackgroundPanStart);
   canvas.removeEventListener('mousemove', handleBackgroundPan);
   canvas.removeEventListener('mouseup', handleBackgroundPanEnd);
   canvas.removeEventListener('mouseleave', handleBackgroundPanEnd);
-
   canvas.removeEventListener('touchstart', handleTouchStart);
   canvas.removeEventListener('touchmove', handleTouchMove);
   canvas.removeEventListener('touchend', handleBackgroundPanEnd);
   canvas.removeEventListener('touchcancel', handleBackgroundPanEnd);
-}
-
-function isCropMode() {
-  return canvas.parentNode.classList.contains('crop');
-}
-
-function exitCropMode() {
-  removeEventListeners();
-  canvas.parentNode.classList.remove('crop');
-  setCanvasTitle("");
 }
 
 function initializeCrop() {
@@ -45,8 +41,8 @@ function initializeCrop() {
     return;
   }
 
+  exitCropMode();
   resetCropStates();
-  removeEventListeners();
 
   canvas.style.backgroundImage = `url(${URL.createObjectURL(imageFile.files[0])})`;
   canvas.style.backgroundSize = '100%';
@@ -70,7 +66,7 @@ function initializeCrop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   setCanvasTitle("裁剪模式: 可用鼠标或触摸缩放移动图片");
-  canvas.parentNode.classList.add('crop');
+  canvas.parentNode.classList.add('crop-mode');
 }
 
 function finishCrop() {

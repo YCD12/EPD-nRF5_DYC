@@ -72,42 +72,6 @@ function initPaintTools() {
     document.getElementById('text-italic').classList.toggle('primary', textItalic);
   });
   
-  setupCanvasForPainting();
-
-  // Ensure no tool is selected by default
-  updateToolUI();
-}
-
-function setActiveTool(tool, title) {
-  currentTool = tool;
-  updateToolUI();
-
-  setCanvasTitle(title);
-
-  // Cancel any pending text placement
-  cancelTextPlacement();
-}
-
-function updateToolUI() {
-  // Update UI to reflect active tool or no tool
-  document.getElementById('brush-mode').classList.toggle('active', currentTool === 'brush');
-  document.getElementById('eraser-mode').classList.toggle('active', currentTool === 'eraser');
-  document.getElementById('text-mode').classList.toggle('active', currentTool === 'text');
-
-  // Show/hide brush tools
-  document.querySelectorAll('.brush-tools').forEach(el => {
-    el.style.display = ['brush', 'eraser', 'text'].includes(currentTool) ? 'flex' : 'none';
-  });
-  document.getElementById('brush-color').disabled = currentTool === 'eraser';
-  document.getElementById('brush-size').disabled = currentTool === 'text';
-
-  // Show/hide text tools
-  document.querySelectorAll('.text-tools').forEach(el => {
-    el.style.display = currentTool === 'text' ? 'flex' : 'none';
-  });
-}
-
-function setupCanvasForPainting() {
   canvas.addEventListener('mousedown', startPaint);
   canvas.addEventListener('mousemove', paint);
   canvas.addEventListener('mouseup', endPaint);
@@ -118,6 +82,25 @@ function setupCanvasForPainting() {
   canvas.addEventListener('touchstart', onTouchStart);
   canvas.addEventListener('touchmove', onTouchMove);
   canvas.addEventListener('touchend', onTouchEnd);
+}
+
+function setActiveTool(tool, title) {
+  setCanvasTitle(title);
+  currentTool = tool;
+
+  canvas.parentNode.classList.toggle('brush-mode', currentTool === 'brush');
+  canvas.parentNode.classList.toggle('eraser-mode', currentTool === 'eraser');
+  canvas.parentNode.classList.toggle('text-mode', currentTool === 'text');
+
+  document.getElementById('brush-mode').classList.toggle('active', currentTool === 'brush');
+  document.getElementById('eraser-mode').classList.toggle('active', currentTool === 'eraser');
+  document.getElementById('text-mode').classList.toggle('active', currentTool === 'text');
+
+  document.getElementById('brush-color').disabled = currentTool === 'eraser';
+  document.getElementById('brush-size').disabled = currentTool === 'text';
+
+  // Cancel any pending text placement
+  cancelTextPlacement();
 }
 
 function startPaint(e) {

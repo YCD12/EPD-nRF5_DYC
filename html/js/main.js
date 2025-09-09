@@ -35,6 +35,9 @@ const canvasSizes = [
   { name: '3.97_800_480', width: 800, height: 480 },
   { name: '4.2_400_300', width: 400, height: 300 },
   { name: '5.79_792_272', width: 792, height: 272 },
+  { name: '5.83_600_448', width: 600, height: 448 },
+  { name: '5.83_648_480', width: 648, height: 480 },
+  { name: '7.5_640_384', width: 640, height: 384 },
   { name: '7.5_800_480', width: 800, height: 480 },
   { name: '10.2_960_640', width: 960, height: 640 },
   { name: '10.85_1360_480', width: 1360, height: 480 },
@@ -451,6 +454,7 @@ function updateImage() {
       convertDithering();
     } else {
       addLog("图片宽高比例与画布不匹配，已进入裁剪模式。");
+      setActiveTool(null, '');
       initializeCrop();
     }
   };

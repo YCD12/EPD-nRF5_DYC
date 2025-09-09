@@ -257,7 +257,7 @@ code {
     margin: 0 auto;
 }
 
-.canvas-container.crop #canvas {
+.canvas-container.crop-mode #canvas {
     border: 2px dashed var(--primary-color);
     cursor: grab;
 }
@@ -372,19 +372,24 @@ canvas.text-placement-mode {
     justify-content: center;
 }
 
+.brush-tools,
 .text-tools,
 .crop-tools {
     display: none;
 }
 
-.canvas-container.crop .tool-buttons,
-.canvas-container.crop .brush-buttons,
-.canvas-container.crop .text-tools {
-    display: none;
+.canvas-container.brush-mode .brush-tools,
+.canvas-container.text-mode .brush-tools,
+.canvas-container.eraser-mode .brush-tools,
+.canvas-container.text-mode .text-tools,
+.canvas-container.crop-mode .crop-tools {
+    display: flex;
 }
 
-.canvas-container.crop .crop-tools {
-    display: flex;
+.canvas-container.crop-mode .tool-buttons,
+.canvas-container.crop-mode .brush-tools,
+.canvas-container.crop-mode .text-tools {
+    display: none;
 }
 
 .tool-button {

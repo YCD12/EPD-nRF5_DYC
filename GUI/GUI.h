@@ -21,7 +21,7 @@ typedef struct {
     uint8_t week_start; // 0: Sunday, 1: Monday
     int8_t temperature;
     float voltage;
-    char ssid[13];
+    char ssid[20];
 } gui_data_t;
 
 void DrawGUI(gui_data_t *data, buffer_callback draw, display_mode_t mode);

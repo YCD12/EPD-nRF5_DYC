@@ -65,7 +65,7 @@ function initializeCrop() {
   // Make the canvas transparent
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  setCanvasTitle("裁剪模式: 可用鼠标或触摸缩放移动图片");
+  setCanvasTitle("裁剪模式: 可用鼠标滚轮或双指触摸缩放图片");
   canvas.parentNode.classList.add('crop-mode');
 }
 

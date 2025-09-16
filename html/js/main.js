@@ -39,6 +39,7 @@ const canvasSizes = [
   { name: '5.83_648_480', width: 648, height: 480 },
   { name: '7.5_640_384', width: 640, height: 384 },
   { name: '7.5_800_480', width: 800, height: 480 },
+  { name: '7.5_880_528', width: 880, height: 528 },
   { name: '10.2_960_640', width: 960, height: 640 },
   { name: '10.85_1360_480', width: 1360, height: 480 },
   { name: '11.6_960_640', width: 960, height: 640 },
@@ -163,7 +164,7 @@ async function sendcmd() {
 
 async function sendimg() {
   if (isCropMode()) {
-    addLog("请先完成图片裁剪！发送已取消。");
+    alert("请先完成图片裁剪！发送已取消。");
     return;
   }
 
@@ -216,7 +217,7 @@ async function sendimg() {
 
 function downloadDataArray() {
   if (isCropMode()) {
-    addLog("请先完成图片裁剪！下载已取消。");
+    alert("请先完成图片裁剪！下载已取消。");
     return;
   }
 
@@ -453,7 +454,7 @@ function updateImage() {
       redrawLineSegments();
       convertDithering();
     } else {
-      addLog("图片宽高比例与画布不匹配，已进入裁剪模式。");
+      alert("图片宽高比例与画布不匹配，将进入裁剪模式。\n请放大图片后移动图片使其充满画布，再点击“完成”按钮。");
       setActiveTool(null, '');
       initializeCrop();
     }

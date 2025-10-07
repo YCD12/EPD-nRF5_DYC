@@ -164,13 +164,6 @@ static void DrawBattery(Adafruit_GFX *gfx, int16_t x, int16_t y, uint8_t iw, flo
     GFX_fillRect(gfx, x + 2, y + 2, 16 * level / 100, 6, GFX_BLACK);
 }
 
-static void DrawTemperature(Adafruit_GFX *gfx, int16_t x, int16_t y, int8_t temp)
-{
-    GFX_setCursor(gfx, x, y);
-    GFX_setFont(gfx, u8g2_font_wqy9_t_lunar);
-    GFX_printf(gfx, "%d℃", temp);
-}
-
 static uint8_t GetWeekOfYear(uint8_t year, uint8_t mon, uint8_t mday, uint8_t wday)
 {
     struct tm tm = {0};
@@ -360,7 +353,13 @@ static void DrawClock(Adafruit_GFX *gfx, tm_t *tm, struct Lunar_Date *Lunar, gui
         Lunar_DateString[Lunar->Date]);
 
     DrawBattery(gfx, 30 + 330 - 10, 25, 20, data->voltage);
-    DrawTemperature(gfx, 330, 58, data->temperature);
+
+    char ssid[5] = {0};
+    int16_t ssid_len = strlen(data->ssid);
+    memcpy(ssid, &data->ssid[ssid_len - 4], 4);
+    GFX_setCursor(gfx, 290, 58);
+    GFX_setFont(gfx, u8g2_font_wqy9_t_lunar);
+    GFX_printf(gfx, "%d℃[%s]", data->temperature, ssid);
 
     GFX_drawFastHLine(gfx, 30, 68, 330, GFX_BLACK);
     DrawTime(gfx, tm, 70, 98, 5, 2);

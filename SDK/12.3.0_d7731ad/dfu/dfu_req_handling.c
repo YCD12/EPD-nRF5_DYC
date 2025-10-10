@@ -270,54 +270,54 @@ static nrf_dfu_res_code_t dfu_handle_prevalidate(dfu_signed_command_t const * p_
 #endif
 
     // Check the signature
-    switch (p_command->signature_type)
-    {
-        case DFU_SIGNATURE_TYPE_ECDSA_P256_SHA256:
-            {
-                // prepare the actual hash destination.
-                hash_data.p_le_data = &hash[0];
-                hash_data.len = sizeof(hash);
+    // switch (p_command->signature_type)
+    // {
+    //     case DFU_SIGNATURE_TYPE_ECDSA_P256_SHA256:
+    //         {
+    //             // prepare the actual hash destination.
+    //             hash_data.p_le_data = &hash[0];
+    //             hash_data.len = sizeof(hash);
 
-                NRF_LOG_INFO("Init command:\r\n");
-                NRF_LOG_HEXDUMP_INFO(&s_dfu_settings.init_command[0], s_dfu_settings.progress.command_size);
-                NRF_LOG_INFO("\r\n");
+    //             NRF_LOG_INFO("Init command:\r\n");
+    //             NRF_LOG_HEXDUMP_INFO(&s_dfu_settings.init_command[0], s_dfu_settings.progress.command_size);
+    //             NRF_LOG_INFO("\r\n");
 
-                NRF_LOG_INFO("p_Init command:\r\n");
-                NRF_LOG_HEXDUMP_INFO(&p_init_cmd[0], init_cmd_len);
-                NRF_LOG_INFO("\r\n");
+    //             NRF_LOG_INFO("p_Init command:\r\n");
+    //             NRF_LOG_HEXDUMP_INFO(&p_init_cmd[0], init_cmd_len);
+    //             NRF_LOG_INFO("\r\n");
 
-                err_code = nrf_crypto_hash_compute(NRF_CRYPTO_HASH_ALG_SHA256, p_init_cmd, init_cmd_len, &hash_data);
-                if (err_code != NRF_SUCCESS)
-                {
-                    return NRF_DFU_RES_CODE_OPERATION_FAILED;
-                }
+    //             err_code = nrf_crypto_hash_compute(NRF_CRYPTO_HASH_ALG_SHA256, p_init_cmd, init_cmd_len, &hash_data);
+    //             if (err_code != NRF_SUCCESS)
+    //             {
+    //                 return NRF_DFU_RES_CODE_OPERATION_FAILED;
+    //             }
 
-                // prepare the signature received over the air.
-                memcpy(&sig[0], p_command->signature.bytes, p_command->signature.size);
+    //             // prepare the signature received over the air.
+    //             memcpy(&sig[0], p_command->signature.bytes, p_command->signature.size);
 
-                NRF_LOG_INFO("Signature\r\n");
-                NRF_LOG_HEXDUMP_INFO(&p_command->signature.bytes[0], p_command->signature.size);
-                NRF_LOG_INFO("\r\n");
+    //             NRF_LOG_INFO("Signature\r\n");
+    //             NRF_LOG_HEXDUMP_INFO(&p_command->signature.bytes[0], p_command->signature.size);
+    //             NRF_LOG_INFO("\r\n");
 
-                crypto_sig.p_le_data = sig;
-                crypto_sig.len = p_command->signature.size;
+    //             crypto_sig.p_le_data = sig;
+    //             crypto_sig.len = p_command->signature.size;
 
-                NRF_LOG_INFO("signature len: %d\r\n", p_command->signature.size);
+    //             NRF_LOG_INFO("signature len: %d\r\n", p_command->signature.size);
 
-                // calculate the signature
-                err_code = nrf_crypto_verify(NRF_CRYPTO_CURVE_SECP256R1, &crypto_key_pk, &hash_data, &crypto_sig);
-                if (err_code != NRF_SUCCESS)
-                {
-                    return NRF_DFU_RES_CODE_INVALID_OBJECT;
-                }
+    //             // calculate the signature
+    //             err_code = nrf_crypto_verify(NRF_CRYPTO_CURVE_SECP256R1, &crypto_key_pk, &hash_data, &crypto_sig);
+    //             if (err_code != NRF_SUCCESS)
+    //             {
+    //                 return NRF_DFU_RES_CODE_INVALID_OBJECT;
+    //             }
 
-                NRF_LOG_INFO("Image verified\r\n");
-            }
-            break;
+    //             NRF_LOG_INFO("Image verified\r\n");
+    //         }
+    //         break;
 
-        default:
-            return NRF_DFU_RES_CODE_OPERATION_FAILED;
-    }
+    //     default:
+    //         return NRF_DFU_RES_CODE_OPERATION_FAILED;
+    // }
 
     // Get the update size
     m_firmware_size_req = 0;

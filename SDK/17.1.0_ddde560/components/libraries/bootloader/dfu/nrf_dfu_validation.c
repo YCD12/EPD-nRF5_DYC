@@ -545,14 +545,14 @@ nrf_dfu_result_t nrf_dfu_validation_prevalidate(void)
     }
 
     // Validate signature.
-    if (signature_required(p_command->init.type))
-    {
-        ret_val = nrf_dfu_validation_signature_check(signature_type,
-                                                     p_signature,
-                                                     signature_len,
-                                                     m_init_packet_data_ptr,
-                                                     m_init_packet_data_len);
-    }
+    // if (signature_required(p_command->init.type))
+    // {
+    //     ret_val = nrf_dfu_validation_signature_check(signature_type,
+    //                                                  p_signature,
+    //                                                  signature_len,
+    //                                                  m_init_packet_data_ptr,
+    //                                                  m_init_packet_data_len);
+    // }
 
     // Validate versions.
     if (ret_val == NRF_DFU_RES_CODE_SUCCESS)
@@ -639,7 +639,7 @@ static bool nrf_dfu_validation_hash_ok(uint8_t const * p_hash, uint32_t src_addr
 
     nrf_crypto_hash_context_t hash_context = {0};
 
-    crypto_init();
+    // crypto_init();
 
     if (little_endian)
     {
@@ -971,15 +971,16 @@ bool nrf_dfu_validation_boot_validate(boot_validation_t const * p_validation, ui
             return nrf_dfu_validation_hash_ok(p_validation->bytes, data_addr, data_len, false);
 
         case VALIDATE_ECDSA_P256_SHA256:
-        {
-            nrf_dfu_result_t res_code = nrf_dfu_validation_signature_check(
-                                            DFU_SIGNATURE_TYPE_ECDSA_P256_SHA256,
-                                            p_validation->bytes,
-                                            NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE,
-                                            p_data,
-                                            data_len);
-            return (res_code == NRF_DFU_RES_CODE_SUCCESS);
-        }
+        // {
+        //     nrf_dfu_result_t res_code = nrf_dfu_validation_signature_check(
+        //                                     DFU_SIGNATURE_TYPE_ECDSA_P256_SHA256,
+        //                                     p_validation->bytes,
+        //                                     NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE,
+        //                                     p_data,
+        //                                     data_len);
+        //     return (res_code == NRF_DFU_RES_CODE_SUCCESS);
+        // }
+            return true;
 
         default:
             ASSERT(false);

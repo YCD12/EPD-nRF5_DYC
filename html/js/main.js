@@ -130,7 +130,7 @@ async function setDriver() {
 
 async function syncTime(mode) {
   if (mode === 2) {
-    if (!confirm('提醒：时钟模式目前使用全刷实现，仅供体验，不建议长期开启，是否继续?')) return;
+    if (!confirm('提醒：时钟模式目前使用全刷实现，此功能目前多用于修复老化屏残影问题，不建议长期开启，是否继续？')) return;
   }
   const timestamp = new Date().getTime() / 1000;
   const data = new Uint8Array([

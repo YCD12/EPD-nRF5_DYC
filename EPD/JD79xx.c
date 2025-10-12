@@ -39,27 +39,27 @@
 #define CMD_PWS 0xE3     // Power Saving Register
 #define CMD_LVSEL 0xE4   // LVD Voltage Select Register
 
-static void JD79668_WaitBusy(uint16_t timeout)
+static void JD79xx_WaitBusy(uint16_t timeout)
 {
     EPD_WaitBusy(LOW, timeout);
 }
 
-static void JD79668_PowerOn(void)
+static void JD79xx_PowerOn(void)
 {
     EPD_WriteCmd(CMD_PON);
-    JD79668_WaitBusy(200);
+    JD79xx_WaitBusy(200);
 }
 
-static void JD79668_PowerOff(void)
+static void JD79xx_PowerOff(void)
 {
     EPD_WriteCmd(CMD_POF);
-    JD79668_WaitBusy(200);
+    JD79xx_WaitBusy(200);
 }
 
-int8_t JD79668_Read_Temp(void)
+int8_t JD79xx_Read_Temp(void)
 {
     EPD_WriteCmd(CMD_TSC);
-    JD79668_WaitBusy(100);
+    JD79xx_WaitBusy(100);
     return (int8_t)EPD_ReadByte();
 }
 
@@ -74,7 +74,7 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 }
 
 // Full update: 20s
-void JD79668_Init()
+void JD79xx_Init()
 {
     epd_model_t *EPD = epd_get();
 
@@ -95,11 +95,11 @@ void JD79668_Init()
     EPD_Write(0xBE, 0xFE);
     EPD_Write(0xE9, 0x01);
 
-    JD79668_PowerOn();
+    JD79xx_PowerOn();
 }
 
 // Fast update: 12s
-void JD79668_Init_Fast()
+void JD79xx_Init_Fast()
 {
     epd_model_t *EPD = epd_get();
 
@@ -121,34 +121,34 @@ void JD79668_Init_Fast()
     EPD_Write(0xE9, 0x01);
     EPD_Write(CMD_PLL, 0x08);
 
-    JD79668_PowerOn();
+    JD79xx_PowerOn();
     EPD_Write(CMD_CCSET, 0x02);
     EPD_Write(0xE6, 0x5A);
     EPD_Write(0xA5, 0x00);
-    JD79668_WaitBusy(200);
+    JD79xx_WaitBusy(200);
 }
 
-static void JD79668_Refresh(void)
+static void JD79xx_Refresh(void)
 {
     NRF_LOG_DEBUG("[EPD]: refresh begin\n");
     epd_model_t *EPD = epd_get();
     _setPartialRamArea(0, 0, EPD->width, EPD->height);
     EPD_Write(CMD_DRF, 0x00);
-    JD79668_WaitBusy(30000);
+    JD79xx_WaitBusy(30000);
     NRF_LOG_DEBUG("[EPD]: refresh end\n");
 }
 
-void JD79668_Clear(bool refresh)
+void JD79xx_Clear(bool refresh)
 {
     epd_model_t *EPD = epd_get();
     uint32_t ram_bytes = ((EPD->width + 3) / 4) * EPD->height;
 
     EPD_FillRAM(CMD_DTM, 0x55, ram_bytes);
     if (refresh)
-        JD79668_Refresh();
+        JD79xx_Refresh();
 }
 
-void JD79668_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void JD79xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
     epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
@@ -166,28 +166,28 @@ void JD79668_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     }
 }
 
-void JD79668_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void JD79xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
 {
     if (begin)
         EPD_WriteCmd(CMD_DTM);
     EPD_WriteData(data, len);
 }
 
-void JD79668_Sleep(void)
+void JD79xx_Sleep(void)
 {
-    JD79668_PowerOff();
+    JD79xx_PowerOff();
     delay(100);
     EPD_Write(CMD_DSLP, 0xA5); // deep sleep
 }
 
 static epd_driver_t epd_drv_JD79668 = {
-    .init = JD79668_Init,
-    .clear = JD79668_Clear,
-    .write_image = JD79668_Write_Image,
-    .write_ram = JD79668_Wite_Ram,
-    .refresh = JD79668_Refresh,
-    .sleep = JD79668_Sleep,
-    .read_temp = JD79668_Read_Temp,
+    .init = JD79xx_Init,
+    .clear = JD79xx_Clear,
+    .write_image = JD79xx_Write_Image,
+    .write_ram = JD79xx_Wite_Ram,
+    .refresh = JD79xx_Refresh,
+    .sleep = JD79xx_Sleep,
+    .read_temp = JD79xx_Read_Temp,
 };
 
 // JD79668 400x300 Black/White/Red/Yellow

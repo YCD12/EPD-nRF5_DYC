@@ -415,19 +415,19 @@
               <FilePath>..\EPD\EPD_service.c</FilePath>
             </File>
             <File>
-              <FileName>UC8176.c</FileName>
+              <FileName>UC81xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\UC8176.c</FilePath>
+              <FilePath>..\EPD\UC81xx.c</FilePath>
             </File>
             <File>
-              <FileName>SSD1619.c</FileName>
+              <FileName>SSD16xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\SSD1619.c</FilePath>
+              <FilePath>..\EPD\SSD16xx.c</FilePath>
             </File>
             <File>
-              <FileName>JD79668.c</FileName>
+              <FileName>JD79xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\JD79668.c</FilePath>
+              <FilePath>..\EPD\JD79xx.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1177,19 +1177,19 @@
               <FilePath>..\EPD\EPD_service.c</FilePath>
             </File>
             <File>
-              <FileName>UC8176.c</FileName>
+              <FileName>UC81xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\UC8176.c</FilePath>
+              <FilePath>..\EPD\UC81xx.c</FilePath>
             </File>
             <File>
-              <FileName>SSD1619.c</FileName>
+              <FileName>SSD16xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\SSD1619.c</FilePath>
+              <FilePath>..\EPD\SSD16xx.c</FilePath>
             </File>
             <File>
-              <FileName>JD79668.c</FileName>
+              <FileName>JD79xx.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\EPD\JD79668.c</FilePath>
+              <FilePath>..\EPD\JD79xx.c</FilePath>
             </File>
           </Files>
         </Group>

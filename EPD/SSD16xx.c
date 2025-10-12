@@ -58,21 +58,21 @@
 #define CMD_DIGITAL_BLOCK_CTRL 0x7E // Set Digital Block Control
 #define CMD_NOP 0x7F                // NOP
 
-static void SSD1619_WaitBusy(uint16_t timeout)
+static void SSD16xx_WaitBusy(uint16_t timeout)
 {
     EPD_WaitBusy(HIGH, timeout);
 }
 
-static void SSD1619_Update(uint8_t seq)
+static void SSD16xx_Update(uint8_t seq)
 {
     EPD_Write(CMD_DISP_CTRL2, seq);
     EPD_WriteCmd(CMD_MASTER_ACTIVATE);
 }
 
-int8_t SSD1619_Read_Temp(void)
+int8_t SSD16xx_Read_Temp(void)
 {
-    SSD1619_Update(0xB1);
-    SSD1619_WaitBusy(500);
+    SSD16xx_Update(0xB1);
+    SSD16xx_WaitBusy(500);
     EPD_WriteCmd(CMD_TSENSOR_READ);
     return (int8_t)EPD_ReadByte();
 }
@@ -89,7 +89,7 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     EPD_Write(CMD_RAM_YCOUNT, y % 256, y / 256);
 }
 
-void SSD1619_Dump_LUT(void)
+void SSD16xx_Dump_LUT(void)
 {
     uint8_t lut[128];
 
@@ -101,14 +101,14 @@ void SSD1619_Dump_LUT(void)
     NRF_LOG_DEBUG("=== LUT END ===\n");
 }
 
-void SSD1619_Init()
+void SSD16xx_Init()
 {
     epd_model_t *EPD = epd_get();
 
     EPD_Reset(HIGH, 10);
 
     EPD_WriteCmd(CMD_SW_RESET);
-    SSD1619_WaitBusy(200);
+    SSD16xx_WaitBusy(200);
 
     EPD_Write(CMD_BORDER_CTRL, 0x01);
     EPD_Write(CMD_TSENSOR_CTRL, 0x80);
@@ -116,25 +116,25 @@ void SSD1619_Init()
     _setPartialRamArea(0, 0, EPD->width, EPD->height);
 }
 
-static void SSD1619_Refresh(void)
+static void SSD16xx_Refresh(void)
 {
     epd_model_t *EPD = epd_get();
 
     EPD_Write(CMD_DISP_CTRL1, EPD->color == BWR ? 0x80 : 0x40, 0x00);
 
     NRF_LOG_DEBUG("[EPD]: refresh begin\n");
-    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", SSD1619_Read_Temp());
-    SSD1619_Update(0xF7);
-    SSD1619_WaitBusy(30000);
+    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", SSD16xx_Read_Temp());
+    SSD16xx_Update(0xF7);
+    SSD16xx_WaitBusy(30000);
     NRF_LOG_DEBUG("[EPD]: refresh end\n");
 
-//    SSD1619_Dump_LUT();
+//    SSD16xx_Dump_LUT();
 
     _setPartialRamArea(0, 0, EPD->width, EPD->height); // DO NOT REMOVE!
-    SSD1619_Update(0x83);                              // power off
+    SSD16xx_Update(0x83);                              // power off
 }
 
-void SSD1619_Clear(bool refresh)
+void SSD16xx_Clear(bool refresh)
 {
     epd_model_t *EPD = epd_get();
     uint32_t ram_bytes = ((EPD->width + 7) / 8) * EPD->height;
@@ -145,10 +145,10 @@ void SSD1619_Clear(bool refresh)
     EPD_FillRAM(CMD_WRITE_RAM2, 0xFF, ram_bytes);
 
     if (refresh)
-        SSD1619_Refresh();
+        SSD16xx_Refresh();
 }
 
-void SSD1619_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void SSD16xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
     epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
@@ -177,7 +177,7 @@ void SSD1619_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     }
 }
 
-void SSD1619_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void SSD16xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
 {
     if (begin) {
         epd_model_t *EPD = epd_get();
@@ -189,20 +189,20 @@ void SSD1619_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
     EPD_WriteData(data, len);
 }
 
-void SSD1619_Sleep(void)
+void SSD16xx_Sleep(void)
 {
     EPD_Write(CMD_SLEEP_MODE, 0x01);
     delay(100);
 }
 
 static epd_driver_t epd_drv_ssd1619 = {
-    .init = SSD1619_Init,
-    .clear = SSD1619_Clear,
-    .write_image = SSD1619_Write_Image,
-    .write_ram = SSD1619_Wite_Ram,
-    .refresh = SSD1619_Refresh,
-    .sleep = SSD1619_Sleep,
-    .read_temp = SSD1619_Read_Temp,
+    .init = SSD16xx_Init,
+    .clear = SSD16xx_Clear,
+    .write_image = SSD16xx_Write_Image,
+    .write_ram = SSD16xx_Wite_Ram,
+    .refresh = SSD16xx_Refresh,
+    .sleep = SSD16xx_Sleep,
+    .read_temp = SSD16xx_Read_Temp,
 };
 
 // SSD1619 400x300 Black/White/Red

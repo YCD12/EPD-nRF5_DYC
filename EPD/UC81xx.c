@@ -1,32 +1,3 @@
-/*****************************************************************************
-* | File        :   EPD_4in2.c
-* | Author      :   Waveshare team
-* | Function    :   4.2inch e-paper
-* | Info        :
-*----------------
-* | This version:   V3.0
-* | Date        :   2019-06-13
-* -----------------------------------------------------------------------------
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documnetation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to  whom the Software is
-# furished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS OR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-#
-******************************************************************************/
 #include "EPD_driver.h"
 #include "nrf_log.h"
 
@@ -73,41 +44,41 @@
 #define CMD_PWS 0xE3   // Power Saving
 #define CMD_TSSET 0xE5 // Force Temperauture
 
-static void UC8176_WaitBusy(uint16_t timeout)
+static void UC81xx_WaitBusy(uint16_t timeout)
 {
     EPD_WaitBusy(LOW, timeout);
 }
 
-static void UC8176_PowerOn(void)
+static void UC81xx_PowerOn(void)
 {
     EPD_WriteCmd(CMD_PON);
-    UC8176_WaitBusy(100);
+    UC81xx_WaitBusy(100);
 }
 
-static void UC8176_PowerOff(void)
+static void UC81xx_PowerOff(void)
 {
     EPD_WriteCmd(CMD_POF);
-    UC8176_WaitBusy(100);
+    UC81xx_WaitBusy(100);
 }
 
 // Read temperature from driver chip
-int8_t UC8176_Read_Temp(void)
+int8_t UC81xx_Read_Temp(void)
 {
     EPD_WriteCmd(CMD_TSC);
-    UC8176_WaitBusy(100);
+    UC81xx_WaitBusy(100);
     return (int8_t)EPD_ReadByte();
 }
 
-void UC8176_Refresh(void)
+void UC81xx_Refresh(void)
 {
     NRF_LOG_DEBUG("[EPD]: refresh begin\n");
-    UC8176_PowerOn();
+    UC81xx_PowerOn();
 
-    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", UC8176_Read_Temp());
+    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", UC81xx_Read_Temp());
     EPD_WriteCmd(CMD_DRF);
     delay(100);
-    UC8176_WaitBusy(30000);
-    UC8176_PowerOff();
+    UC81xx_WaitBusy(30000);
+    UC81xx_PowerOff();
     NRF_LOG_DEBUG("[EPD]: refresh end\n");
 }
 
@@ -125,11 +96,11 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
               0x01);
 }
 
-void UC8176_Dump_OTP(void)
+void UC81xx_Dump_OTP(void)
 {
     uint8_t data[128];
 
-    UC8176_PowerOn();
+    UC81xx_PowerOn();
     EPD_Write(CMD_ROTP, 0x00);
 
     NRF_LOG_DEBUG("=== OTP BEGIN ===\n");
@@ -139,22 +110,22 @@ void UC8176_Dump_OTP(void)
     }
     NRF_LOG_DEBUG("=== OTP END ===\n");
 
-    UC8176_PowerOff();
+    UC81xx_PowerOff();
 }
 
-void UC8176_Init()
+void UC81xx_Init()
 {
     epd_model_t *EPD = epd_get();
 
     EPD_Reset(HIGH, 10);
     
-//    UC8176_Dump_OTP();
+//    UC81xx_Dump_OTP();
 
     EPD_Write(CMD_PSR, EPD->color == BWR ? 0x0F : 0x1F);
     EPD_Write(CMD_CDI, EPD->color == BWR ? 0x77 : 0x97);
 }
 
-void UC8176_Clear(bool refresh)
+void UC81xx_Clear(bool refresh)
 {
     epd_model_t *EPD = epd_get();
     uint32_t ram_bytes = ((EPD->width + 7) / 8) * EPD->height;
@@ -163,10 +134,10 @@ void UC8176_Clear(bool refresh)
     EPD_FillRAM(CMD_DTM2, 0xFF, ram_bytes);
 
     if (refresh)
-        UC8176_Refresh();
+        UC81xx_Refresh();
 }
 
-void UC8176_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void UC81xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
     epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
@@ -200,7 +171,7 @@ void UC8176_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, 
     EPD_WriteCmd(CMD_PTOUT); // partial out
 }
 
-void UC8176_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void UC81xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
 {
     if (begin) {
         epd_model_t *EPD = epd_get();
@@ -212,22 +183,22 @@ void UC8176_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
     EPD_WriteData(data, len);
 }
 
-void UC8176_Sleep(void)
+void UC81xx_Sleep(void)
 {
-    UC8176_PowerOff();
+    UC81xx_PowerOff();
 
     EPD_Write(CMD_DSLP, 0xA5);
 }
 
 // Declare driver and models
 static epd_driver_t epd_drv_uc8176 = {
-    .init = UC8176_Init,
-    .clear = UC8176_Clear,
-    .write_image = UC8176_Write_Image,
-    .write_ram = UC8176_Wite_Ram,
-    .refresh = UC8176_Refresh,
-    .sleep = UC8176_Sleep,
-    .read_temp = UC8176_Read_Temp,
+    .init = UC81xx_Init,
+    .clear = UC81xx_Clear,
+    .write_image = UC81xx_Write_Image,
+    .write_ram = UC81xx_Wite_Ram,
+    .refresh = UC81xx_Refresh,
+    .sleep = UC81xx_Sleep,
+    .read_temp = UC81xx_Read_Temp,
 };
 
 // UC8176 400x300 Black/White

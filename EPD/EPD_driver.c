@@ -319,7 +319,9 @@ float EPD_ReadVoltage(void)
 // EPD models
 extern epd_model_t epd_uc8176_420_bw;
 extern epd_model_t epd_uc8176_420_bwr;
+extern epd_model_t epd_uc8159_750_bw;
 extern epd_model_t epd_uc8159_750_bwr;
+extern epd_model_t epd_uc8179_750_bw;
 extern epd_model_t epd_uc8179_750_bwr;
 extern epd_model_t epd_ssd1619_420_bwr;
 extern epd_model_t epd_ssd1619_420_bw;
@@ -328,7 +330,9 @@ extern epd_model_t epd_jd79668_420;
 static epd_model_t *epd_models[] = {
     &epd_uc8176_420_bw,
     &epd_uc8176_420_bwr,
+    &epd_uc8159_750_bw,
     &epd_uc8159_750_bwr,
+    &epd_uc8179_750_bw,
     &epd_uc8179_750_bwr,
     &epd_ssd1619_420_bwr,
     &epd_ssd1619_420_bw,

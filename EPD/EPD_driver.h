@@ -46,8 +46,10 @@ typedef enum
     EPD_SSD1619_420_BWR = 2,
     EPD_SSD1619_420_BW = 4,
     EPD_JD79668_420_BWRY = 5,
-    EPD_UC8179_750_BWR = 6,
-    EPD_UC8159_750_LOW_BWR = 7,
+    EPD_UC8179_750_BW = 6,
+    EPD_UC8179_750_BWR = 7,
+    EPD_UC8159_750_LOW_BW = 8,
+    EPD_UC8159_750_LOW_BWR = 9,
 } epd_model_id_t;
 
 typedef enum

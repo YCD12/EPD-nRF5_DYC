@@ -325,6 +325,15 @@ const epd_model_t epd_uc8176_420_bwr = {
     .height = 300,
 };
 
+// UC8159 640x384 Black/White
+const epd_model_t epd_uc8159_750_bw = {
+    .id = EPD_UC8159_750_LOW_BW,
+    .color = BW,
+    .drv = &epd_drv_uc8159,
+    .width = 640,
+    .height = 384,
+};
+
 // UC8159 640x384 Black/White/Red
 const epd_model_t epd_uc8159_750_bwr = {
     .id = EPD_UC8159_750_LOW_BWR,
@@ -332,6 +341,15 @@ const epd_model_t epd_uc8159_750_bwr = {
     .drv = &epd_drv_uc8159,
     .width = 640,
     .height = 384,
+};
+
+// UC8179 800x480 Black/White/Red
+const epd_model_t epd_uc8179_750_bw = {
+    .id = EPD_UC8179_750_BW,
+    .color = BW,
+    .drv = &epd_drv_uc81xx,
+    .width = 800,
+    .height = 480,
 };
 
 // UC8179 800x480 Black/White/Red

@@ -57,6 +57,8 @@ void GFX_end(Adafruit_GFX *gfx);
 // DRAW API
 void GFX_drawPixel(Adafruit_GFX *gfx, int16_t x, int16_t y, uint16_t color);
 void GFX_drawLine(Adafruit_GFX *gfx, int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+void GFX_drawDottedLine(Adafruit_GFX *gfx, int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+                          uint16_t color, uint8_t dot_len, uint8_t space_len);
 void GFX_drawFastVLine(Adafruit_GFX *gfx, int16_t x, int16_t y, int16_t h, uint16_t color);
 void GFX_drawFastHLine(Adafruit_GFX *gfx, int16_t x, int16_t y, int16_t w, uint16_t color);
 void GFX_fillRect(Adafruit_GFX *gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
@@ -87,10 +89,12 @@ void GFX_setFontDirection(Adafruit_GFX *gfx, GFX_Rotate d);
 void GFX_setTextColor(Adafruit_GFX *gfx, uint16_t fg, uint16_t bg);
 int8_t GFX_getFontAscent(Adafruit_GFX *gfx);
 int8_t GFX_getFontDescent(Adafruit_GFX *gfx);
+int8_t GFX_getFontHeight(Adafruit_GFX *gfx);
 int16_t GFX_drawGlyph(Adafruit_GFX *gfx, int16_t x, int16_t y, uint16_t e);
 int16_t GFX_drawStr(Adafruit_GFX *gfx, int16_t x, int16_t y, const char *s);
 int16_t GFX_drawUTF8(Adafruit_GFX *gfx, int16_t x, int16_t y, const char *str);
 int16_t GFX_getUTF8Width(Adafruit_GFX *gfx, const char *str);
+int16_t GFX_getUTF8Widthf(Adafruit_GFX *gfx, const char* format, ...);
 size_t GFX_print(Adafruit_GFX *gfx, const char c);
 size_t GFX_write(Adafruit_GFX *gfx, const char *buffer, size_t size);
 size_t GFX_printf(Adafruit_GFX *gfx, const char* format, ...);

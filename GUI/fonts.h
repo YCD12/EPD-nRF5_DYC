@@ -24,11 +24,6 @@
 休班
  */
 extern const uint8_t u8g2_font_wqy9_t_lunar[] U8G2_FONT_SECTION("u8g2_font_wqy9_t_lunar");
-/**
- * 文字列表:
-0-9 (48-57)
-年月日
- */
 extern const uint8_t u8g2_font_wqy12_t_lunar[] U8G2_FONT_SECTION("u8g2_font_wqy12_t_lunar");
 
 // 以下字库来自 u8g2，用于显示数字

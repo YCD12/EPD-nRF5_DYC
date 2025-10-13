@@ -359,6 +359,71 @@ void GFX_drawLine(Adafruit_GFX *gfx, int16_t x0, int16_t y0, int16_t x1, int16_t
     }
   }
 }
+
+/**************************************************************************/
+/*!
+   @brief    Draw a dotted line.  Bresenham's algorithm - thx wikpedia
+    @param    x0  Start point x coordinate
+    @param    y0  Start point y coordinate
+    @param    x1  End point x coordinate
+    @param    y1  End point y coordinate
+    @param    color 16-bit 5-6-5 Color to draw with
+*/
+/**************************************************************************/
+void GFX_drawDottedLine(Adafruit_GFX *gfx, int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+                          uint16_t color, uint8_t dot_len, uint8_t space_len) {
+  int16_t steep = ABS(y1 - y0) > ABS(x1 - x0);
+  if (steep) {
+    SWAP(x0, y0, int16_t);
+    SWAP(x1, y1, int16_t);
+  }
+
+  if (x0 > x1) {
+    SWAP(x0, x1, int16_t);
+    SWAP(y0, y1, int16_t);
+  }
+
+  int16_t dx, dy;
+  dx = x1 - x0;
+  dy = ABS(y1 - y0);
+
+  int16_t err = dx / 2;
+  int16_t ystep;
+
+  if (y0 < y1) {
+    ystep = 1;
+  } else {
+    ystep = -1;
+  }
+
+  uint8_t draw = 1;
+  uint8_t len = 0;
+  for (; x0 <= x1; x0++) {
+    if (draw) {
+      if (steep) {
+        GFX_drawPixel(gfx, y0, x0, color);
+      } else {
+        GFX_drawPixel(gfx, x0, y0, color);
+      }
+      len++;
+      if (len >= dot_len) {
+        len = 0;
+        draw = 0;
+      }
+    } else {
+      len++;
+      if (len >= space_len) {
+        len = 0;
+        draw = 1;
+      }
+    }
+    err -= dy;
+    if (err < 0) {
+      y0 += ystep;
+      err += dx;
+    }
+  }
+}
                                   
 /**************************************************************************/
 /*!
@@ -860,6 +925,10 @@ int8_t GFX_getFontDescent(Adafruit_GFX *gfx) {
   return gfx->u8g2.font_info.descent_g;
 }
 
+int8_t GFX_getFontHeight(Adafruit_GFX *gfx) {
+  return gfx->u8g2.font_info.ascent_A - gfx->u8g2.font_info.descent_g;
+}
+
 int16_t GFX_drawGlyph(Adafruit_GFX *gfx, int16_t x, int16_t y, uint16_t e) {
   return u8g2_DrawGlyph(&gfx->u8g2, x, y, e);
 }
@@ -988,6 +1057,35 @@ int16_t GFX_getUTF8Width(Adafruit_GFX *gfx, const char *str)
     /* issue #46: we have to add the x offset also */
     w += gfx->u8g2.glyph_x_offset;  /* this value is set as a side effect of u8g2_GetGlyphWidth() */
   }
+  
+  return w;
+}
+
+int16_t GFX_getUTF8Widthf(Adafruit_GFX *gfx, const char* format, ...)
+{
+  char buf[64] = {0};
+  char *str = buf;
+  size_t len;
+  va_list va;
+
+  va_start(va, format);
+  len = vsnprintf(buf, sizeof(buf), format, va);
+  va_end(va);
+
+  if (len > sizeof(buf) - 1)
+  {
+    str = malloc(len + 1);
+    if (str == NULL)
+      return 0;
+    va_start(va, format);
+    vsnprintf(str, len + 1, format, va);
+    va_end(va);
+  }
+  
+  int16_t w = GFX_getUTF8Width(gfx, str);
+
+  if (str != buf)
+    free(str);
   
   return w;
 }

@@ -79,13 +79,27 @@ int8_t SSD16xx_Read_Temp(void)
 
 static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
+    epd_model_t *EPD = epd_get();
+
     EPD_Write(CMD_ENTRY_MODE, 0x03); // set ram entry mode: x increase, y increase
-    EPD_Write(CMD_RAM_XPOS, x / 8, (x + w - 1) / 8);
+    if (EPD->id == EPD_SSD1677_750_HD_BW || EPD->id == EPD_SSD1677_750_HD_BWR) {
+        EPD_Write(CMD_RAM_XPOS,
+                  x % 256, x / 256,
+                  (x + w - 1) % 256,
+                  (x + w - 1) / 256);
+        EPD_Write(CMD_RAM_XCOUNT, x % 256, x / 256);
+    } else {
+        EPD_Write(CMD_RAM_XPOS, x / 8, (x + w - 1) / 8);
+        EPD_Write(CMD_RAM_YPOS,
+                  y % 256, y / 256,
+                  (y + h - 1) % 256,
+                  (y + h - 1) / 256);
+        EPD_Write(CMD_RAM_XCOUNT, x / 8);
+    }
     EPD_Write(CMD_RAM_YPOS,
-              y % 256, y / 256,
-              (y + h - 1) % 256,
-              (y + h - 1) / 256);
-    EPD_Write(CMD_RAM_XCOUNT, x / 8);
+                  y % 256, y / 256,
+                  (y + h - 1) % 256,
+                  (y + h - 1) / 256);
     EPD_Write(CMD_RAM_YCOUNT, y % 256, y / 256);
 }
 
@@ -221,4 +235,22 @@ const epd_model_t epd_ssd1619_420_bw = {
     .drv = &epd_drv_ssd1619,
     .width = 400,
     .height = 300,
+};
+
+// SSD1677 880x528 Black/White/Red
+const epd_model_t epd_ssd1677_750_bwr = {
+    .id = EPD_SSD1677_750_HD_BWR,
+    .color = BWR,
+    .drv = &epd_drv_ssd1619,
+    .width = 880,
+    .height = 528,
+};
+
+// SSD1677 880x528 Black/White
+const epd_model_t epd_ssd1677_750_bw = {
+    .id = EPD_SSD1677_750_HD_BW,
+    .color = BW,
+    .drv = &epd_drv_ssd1619,
+    .width = 880,
+    .height = 528,
 };

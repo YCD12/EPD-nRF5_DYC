@@ -87,7 +87,6 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     uint16_t xe = (x + w - 1) | 0x0007; // byte boundary inclusive (last byte)
     uint16_t ye = y + h - 1;
     x &= 0xFFF8;       // byte boundary
-    xe |= 0x0007;      // byte boundary
     EPD_Write(CMD_PTL, // partial window
               x / 256, x % 256,
               xe / 256, xe % 256,

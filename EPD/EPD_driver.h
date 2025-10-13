@@ -50,6 +50,8 @@ typedef enum
     EPD_UC8179_750_BWR = 7,
     EPD_UC8159_750_LOW_BW = 8,
     EPD_UC8159_750_LOW_BWR = 9,
+    EPD_SSD1677_750_HD_BW = 10,
+    EPD_SSD1677_750_HD_BWR = 11,
 } epd_model_id_t;
 
 typedef enum

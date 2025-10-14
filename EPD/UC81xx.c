@@ -255,8 +255,10 @@ void UC8159_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, 
     EPD_WriteCmd(CMD_PTOUT); // partial out
 }
 
-void UC81xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void UC81xx_Wite_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
 {
+    bool begin = (cfg >> 4) == 0x00;
+    bool black = (cfg & 0x0F) == 0x0F;
     if (begin) {
         epd_model_t *EPD = epd_get();
         if (EPD->color == BWR)
@@ -268,13 +270,12 @@ void UC81xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
 }
 
 // only black pixels are handled
-void UC8159_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void UC8159_Wite_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
 {
+    bool begin = (cfg >> 4) == 0x00;
+    bool black = (cfg & 0x0F) == 0x0F;
     if (begin && black) EPD_WriteCmd(CMD_DTM1);
-    for (uint8_t i = 0; i < len; i ++) {
-        uint8_t black_data = data[i];
-        UC8159_Send_Pixel(black_data, 0xFF);
-    }
+    EPD_WriteData(data, len);
 }
 
 void UC81xx_Sleep(void)

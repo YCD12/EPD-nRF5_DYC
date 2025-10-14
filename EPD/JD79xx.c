@@ -166,8 +166,9 @@ void JD79xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, 
     }
 }
 
-void JD79xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void JD79xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
 {
+    bool begin = (cfg >> 4) == 0x00;
     if (begin)
         EPD_WriteCmd(CMD_DTM);
     EPD_WriteData(data, len);
@@ -184,7 +185,7 @@ static epd_driver_t epd_drv_JD79668 = {
     .init = JD79xx_Init,
     .clear = JD79xx_Clear,
     .write_image = JD79xx_Write_Image,
-    .write_ram = JD79xx_Wite_Ram,
+    .write_ram = JD79xx_Write_Ram,
     .refresh = JD79xx_Refresh,
     .sleep = JD79xx_Sleep,
     .read_temp = JD79xx_Read_Temp,

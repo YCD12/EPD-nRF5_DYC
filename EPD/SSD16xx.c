@@ -191,8 +191,10 @@ void SSD16xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     }
 }
 
-void SSD16xx_Wite_Ram(bool begin, bool black, uint8_t *data, uint8_t len)
+void SSD16xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
 {
+    bool begin = (cfg >> 4) == 0x00;
+    bool black = (cfg & 0x0F) == 0x0F;
     if (begin) {
         epd_model_t *EPD = epd_get();
         if (EPD->color == BWR)
@@ -213,7 +215,7 @@ static epd_driver_t epd_drv_ssd1619 = {
     .init = SSD16xx_Init,
     .clear = SSD16xx_Clear,
     .write_image = SSD16xx_Write_Image,
-    .write_ram = SSD16xx_Wite_Ram,
+    .write_ram = SSD16xx_Write_Ram,
     .refresh = SSD16xx_Refresh,
     .sleep = SSD16xx_Sleep,
     .read_temp = SSD16xx_Read_Temp,

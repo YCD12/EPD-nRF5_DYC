@@ -162,6 +162,33 @@ async function sendcmd() {
   await write(bytes[0], bytes.length > 1 ? bytes.slice(1) : null);
 }
 
+function convertUC8159(blackWhiteData, redWhiteData) {
+  const halfLength = blackWhiteData.length;
+  let payloadData = new Uint8Array(halfLength * 4);
+  let payloadIdx = 0;
+  let black_data, color_data, data;
+  for (let i = 0; i < halfLength; i++) {
+    black_data = blackWhiteData[i];
+    color_data = redWhiteData[i];
+    for (let j = 0; j < 8; j++) {
+      if ((color_data & 0x80) == 0x00) data = 0x04;  // red
+      else if ((black_data & 0x80) == 0x00) data = 0x00;  // black
+      else data = 0x03;  // white
+      data = (data << 4) & 0xFF;
+      black_data = (black_data << 1) & 0xFF;
+      color_data = (color_data << 1) & 0xFF;
+      j++;
+      if ((color_data & 0x80) == 0x00) data |= 0x04;  // red
+      else if ((black_data & 0x80) == 0x00) data |= 0x00;  // black
+      else data |= 0x03;  // white
+      black_data = (black_data << 1) & 0xFF;
+      color_data = (color_data << 1) & 0xFF;
+      payloadData[payloadIdx++] = data;
+    }
+  }
+  return payloadData;
+}
+
 async function sendimg() {
   if (isCropMode()) {
     alert("请先完成图片裁剪！发送已取消。");
@@ -193,8 +220,14 @@ async function sendimg() {
     await writeImage(processedData, 'color');
   } else if (ditherMode === 'threeColor') {
     const halfLength = Math.floor(processedData.length / 2);
-    await writeImage(processedData.slice(0, halfLength), 'bw');
-    await writeImage(processedData.slice(halfLength), 'red');
+    const blackWhiteData = processedData.slice(0, halfLength);
+    const redWhiteData = processedData.slice(halfLength);
+    if (epdDriverSelect.value === '08' || epdDriverSelect.value === '09') {
+      await writeImage(convertUC8159(blackWhiteData, redWhiteData), 'bw');
+    } else {
+      await writeImage(blackWhiteData, 'bw');
+      await writeImage(redWhiteData, 'red');
+    }
   } else if (ditherMode === 'blackWhiteColor') {
     await writeImage(processedData, 'bw');
   } else {

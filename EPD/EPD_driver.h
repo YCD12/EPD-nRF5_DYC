@@ -22,7 +22,15 @@
 #include "nrf_gpio.h"
 #include "EPD_config.h"
 
-#define BIT(n)  (1UL << (n))
+typedef enum
+{
+    EPD_DRIVER_IC_UC8176 = 1,
+    EPD_DRIVER_IC_SSD1619 = 2,
+    EPD_DRIVER_IC_JD79668 = 3,
+    EPD_DRIVER_IC_UC8159 = 4,
+    EPD_DRIVER_IC_UC8179 = 5,
+    EPD_DRIVER_IC_SSD1677 = 6,
+} epd_driver_ic_t;
 
 /**@brief EPD driver structure.
  *
@@ -30,6 +38,8 @@
  */
 typedef struct
 {
+    epd_driver_ic_t ic;                               /**< EPD driver IC type */
+
     void (*init)();                                   /**< Initialize the e-Paper register */
     void (*clear)(bool refresh);                      /**< Clear screen */
     void (*write_image)(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h); /**< write image */

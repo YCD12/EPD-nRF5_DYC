@@ -82,7 +82,7 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     epd_model_t *EPD = epd_get();
 
     EPD_Write(CMD_ENTRY_MODE, 0x03); // set ram entry mode: x increase, y increase
-    if (EPD->id == EPD_SSD1677_750_HD_BW || EPD->id == EPD_SSD1677_750_HD_BWR) {
+    if (EPD->drv->ic == EPD_DRIVER_IC_SSD1677) {
         EPD_Write(CMD_RAM_XPOS,
                   x % 256, x / 256,
                   (x + w - 1) % 256,
@@ -212,6 +212,18 @@ void SSD16xx_Sleep(void)
 }
 
 static epd_driver_t epd_drv_ssd1619 = {
+    .ic = EPD_DRIVER_IC_SSD1619,
+    .init = SSD16xx_Init,
+    .clear = SSD16xx_Clear,
+    .write_image = SSD16xx_Write_Image,
+    .write_ram = SSD16xx_Write_Ram,
+    .refresh = SSD16xx_Refresh,
+    .sleep = SSD16xx_Sleep,
+    .read_temp = SSD16xx_Read_Temp,
+};
+
+static epd_driver_t epd_drv_ssd1677 = {
+    .ic = EPD_DRIVER_IC_SSD1677,
     .init = SSD16xx_Init,
     .clear = SSD16xx_Clear,
     .write_image = SSD16xx_Write_Image,
@@ -243,7 +255,7 @@ const epd_model_t epd_ssd1619_420_bw = {
 const epd_model_t epd_ssd1677_750_bwr = {
     .id = EPD_SSD1677_750_HD_BWR,
     .color = BWR,
-    .drv = &epd_drv_ssd1619,
+    .drv = &epd_drv_ssd1677,
     .width = 880,
     .height = 528,
 };
@@ -252,7 +264,7 @@ const epd_model_t epd_ssd1677_750_bwr = {
 const epd_model_t epd_ssd1677_750_bw = {
     .id = EPD_SSD1677_750_HD_BW,
     .color = BW,
-    .drv = &epd_drv_ssd1619,
+    .drv = &epd_drv_ssd1677,
     .width = 880,
     .height = 528,
 };

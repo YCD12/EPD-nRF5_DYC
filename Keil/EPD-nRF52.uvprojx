@@ -424,11 +424,6 @@
               <FileType>1</FileType>
               <FilePath>..\EPD\SSD16xx.c</FilePath>
             </File>
-            <File>
-              <FileName>JD79xx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\EPD\JD79xx.c</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
@@ -1185,11 +1180,6 @@
               <FileName>SSD16xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\EPD\SSD16xx.c</FilePath>
-            </File>
-            <File>
-              <FileName>JD79xx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\EPD\JD79xx.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -62,18 +62,16 @@ static void UC81xx_PowerOff(void)
 }
 
 // Read temperature from driver chip
-int8_t UC81xx_Read_Temp(void)
+int8_t UC81xx_Read_Temp(epd_model_t *epd)
 {
     EPD_WriteCmd(CMD_TSC);
     UC81xx_WaitBusy(100);
     return (int8_t)EPD_ReadByte();
 }
 
-static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+static void _setPartialRamArea(epd_model_t *epd, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
-
-    if (EPD->drv->ic == EPD_DRIVER_IC_JD79668) {
+    if (epd->drv->ic == EPD_DRIVER_IC_JD79668) {
         EPD_Write(0x83, // partial window
               x / 256, x % 256,
               (x + w - 1) / 256, (x + w - 1) % 256,
@@ -93,21 +91,19 @@ static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
     }
 }
 
-void UC81xx_Refresh(void)
+void UC81xx_Refresh(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
     NRF_LOG_DEBUG("[EPD]: refresh begin\n");
-    if (EPD->drv->ic != EPD_DRIVER_IC_JD79668)
+    if (epd->drv->ic != EPD_DRIVER_IC_JD79668)
         UC81xx_PowerOn();
 
-    _setPartialRamArea(0, 0, EPD->width, EPD->height);
+    _setPartialRamArea(epd, 0, 0, epd->width, epd->height);
 
     EPD_WriteCmd(CMD_DRF);
     delay(100);
     UC81xx_WaitBusy(30000);
 
-    if (EPD->drv->ic != EPD_DRIVER_IC_JD79668)
+    if (epd->drv->ic != EPD_DRIVER_IC_JD79668)
         UC81xx_PowerOff();
     NRF_LOG_DEBUG("[EPD]: refresh end\n");
 }
@@ -129,22 +125,18 @@ void UC81xx_Dump_OTP(void)
     UC81xx_PowerOff();
 }
 
-void UC81xx_Init()
+void UC81xx_Init(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
     EPD_Reset(HIGH, 10);
     
 //    UC81xx_Dump_OTP();
 
-    EPD_Write(CMD_PSR, EPD->color == BWR ? 0x0F : 0x1F);
-    EPD_Write(CMD_CDI, EPD->color == BWR ? 0x77 : 0x97);
+    EPD_Write(CMD_PSR, epd->color == BWR ? 0x0F : 0x1F);
+    EPD_Write(CMD_CDI, epd->color == BWR ? 0x77 : 0x97);
 }
 
-void UC8159_Init()
+void UC8159_Init(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
     EPD_Reset(HIGH, 10);
 
     EPD_Write(CMD_PWR, 0x37, 0x00);
@@ -157,16 +149,14 @@ void UC8159_Init()
     EPD_Write(0x65, 0x00); // FLASH CONTROL
     EPD_Write(0xe5, 0x03); // FLASH MODE
     EPD_Write(CMD_TRES,
-              EPD->width >> 8,
-              EPD->width & 0xff,
-              EPD->height >> 8,
-              EPD->height & 0xff);
+              epd->width >> 8,
+              epd->width & 0xff,
+              epd->height >> 8,
+              epd->height & 0xff);
 }
 
-void JD79668_Init()
+void JD79668_Init(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
     EPD_Reset(HIGH, 50);
 
     EPD_Write(0x4D, 0x78);
@@ -175,8 +165,8 @@ void JD79668_Init()
     EPD_Write(CMD_PLL, 0x08);
     EPD_Write(CMD_CDI, 0x37);
     EPD_Write(CMD_TRES,
-              EPD->width / 256, EPD->width % 256,
-              EPD->height / 256, EPD->height % 256);
+              epd->width / 256, epd->width % 256,
+              epd->height / 256, epd->height % 256);
 
     EPD_Write(0xAE, 0xCF);
     EPD_Write(0xB0, 0x13);
@@ -187,25 +177,23 @@ void JD79668_Init()
     UC81xx_PowerOn();
 }
 
-void UC81xx_Clear(bool refresh)
+void UC81xx_Clear(epd_model_t *epd, bool refresh)
 {
-    epd_model_t *EPD = epd_get();
-    uint32_t ram_bytes = ((EPD->width + 7) / 8) * EPD->height;
+    uint32_t ram_bytes = ((epd->width + 7) / 8) * epd->height;
 
     EPD_FillRAM(CMD_DTM1, 0xFF, ram_bytes);
     EPD_FillRAM(CMD_DTM2, 0xFF, ram_bytes);
 
     if (refresh)
-        UC81xx_Refresh();
+        UC81xx_Refresh(epd);
 }
 
-void UC8159_Clear(bool refresh)
+void UC8159_Clear(epd_model_t *epd, bool refresh)
 {
-    epd_model_t *EPD = epd_get();
-    uint32_t wb = (EPD->width + 7) / 8;
+    uint32_t wb = (epd->width + 7) / 8;
 
     EPD_WriteCmd(CMD_DTM1);
-    for (uint32_t j = 0; j < EPD->height; j++) {
+    for (uint32_t j = 0; j < epd->height; j++) {
         for (uint32_t i = 0; i < wb; i++) {
             for (uint8_t k = 0; k < 4; k++) {
                 EPD_WriteByte(0x33);
@@ -214,32 +202,30 @@ void UC8159_Clear(bool refresh)
     }
 
     if (refresh)
-        UC81xx_Refresh();
+        UC81xx_Refresh(epd);
 }
 
-void JD79668_Clear(bool refresh)
+void JD79668_Clear(epd_model_t *epd, bool refresh)
 {
-    epd_model_t *EPD = epd_get();
-    uint32_t ram_bytes = ((EPD->width + 3) / 4) * EPD->height;
+    uint32_t ram_bytes = ((epd->width + 3) / 4) * epd->height;
 
     EPD_FillRAM(CMD_DTM1, 0x55, ram_bytes);
 
     if (refresh)
-        UC81xx_Refresh();
+        UC81xx_Refresh(epd);
 }
 
-void UC81xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void UC81xx_Write_Image(epd_model_t *epd, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
     x -= x % 8;                // byte boundary
     w = wb * 8;                // byte boundary
-    if (x + w > EPD->width || y + h > EPD->height)
+    if (x + w > epd->width || y + h > epd->height)
         return;
 
     EPD_WriteCmd(CMD_PTIN); // partial in
-    _setPartialRamArea(x, y, w, h);
-    if (EPD->color == BWR)
+    _setPartialRamArea(epd, x, y, w, h);
+    if (epd->color == BWR)
     {
         EPD_WriteCmd(CMD_DTM1);
         for (uint16_t i = 0; i < h; i++)
@@ -253,7 +239,7 @@ void UC81xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, 
     {
         for (uint16_t j = 0; j < w / 8; j++)
         {
-            if (EPD->color == BWR)
+            if (epd->color == BWR)
                 EPD_WriteByte(color ? color[j + i * wb] : 0xFF);
             else
                 EPD_WriteByte(black[j + i * wb]);
@@ -281,17 +267,16 @@ static void UC8159_Send_Pixel(uint8_t black_data, uint8_t color_data) {
     }
 }
 
-void UC8159_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void UC8159_Write_Image(epd_model_t *epd, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
     x -= x % 8;                // byte boundary
     w = wb * 8;                // byte boundary
-    if (x + w > EPD->width || y + h > EPD->height)
+    if (x + w > epd->width || y + h > epd->height)
         return;
 
     EPD_WriteCmd(CMD_PTIN); // partial in
-    _setPartialRamArea(x, y, w, h);
+    _setPartialRamArea(epd, x, y, w, h);
     EPD_WriteCmd(CMD_DTM1);
     for (uint16_t i = 0; i < h; i++)
     {
@@ -307,16 +292,15 @@ void UC8159_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, 
     EPD_WriteCmd(CMD_PTOUT); // partial out
 }
 
-void JD79668_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void JD79668_Write_Image(epd_model_t *epd, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
     x -= x % 8;                // byte boundary
     w = wb * 8;                // byte boundary
-    if (x + w > EPD->width || y + h > EPD->height)
+    if (x + w > epd->width || y + h > epd->height)
         return;
 
-    _setPartialRamArea(x, y, w, h);
+    _setPartialRamArea(epd, x, y, w, h);
     EPD_WriteCmd(CMD_DTM1);
     for (uint16_t i = 0; i < h * 2; i++) // 2 bits per pixel
     {
@@ -325,13 +309,12 @@ void JD79668_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     }
 }
 
-void UC81xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
+void UC81xx_Write_Ram(epd_model_t *epd, uint8_t cfg, uint8_t *data, uint8_t len)
 {
     bool begin = (cfg >> 4) == 0x00;
     bool black = (cfg & 0x0F) == 0x0F;
     if (begin) {
-        epd_model_t *EPD = epd_get();
-        if (EPD->color == BWR)
+        if (epd->color == BWR)
             EPD_WriteCmd(black ? CMD_DTM1 : CMD_DTM2);
         else
             EPD_WriteCmd(CMD_DTM2);
@@ -340,7 +323,7 @@ void UC81xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
 }
 
 // Write native data to ram, format should be 2pp or above
-void UC81xx_Write_Ram_Native(uint8_t cfg, uint8_t *data, uint8_t len)
+void UC81xx_Write_Ram_Native(epd_model_t *epd, uint8_t cfg, uint8_t *data, uint8_t len)
 {
     bool begin = (cfg >> 4) == 0x00;
     bool black = (cfg & 0x0F) == 0x0F;
@@ -348,7 +331,7 @@ void UC81xx_Write_Ram_Native(uint8_t cfg, uint8_t *data, uint8_t len)
     EPD_WriteData(data, len);
 }
 
-void UC81xx_Sleep(void)
+void UC81xx_Sleep(epd_model_t *epd)
 {
     UC81xx_PowerOff();
     delay(100);

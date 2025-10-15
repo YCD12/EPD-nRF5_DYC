@@ -69,7 +69,7 @@ static void SSD16xx_Update(uint8_t seq)
     EPD_WriteCmd(CMD_MASTER_ACTIVATE);
 }
 
-int8_t SSD16xx_Read_Temp(void)
+int8_t SSD16xx_Read_Temp(epd_model_t *epd)
 {
     SSD16xx_Update(0xB1);
     SSD16xx_WaitBusy(500);
@@ -77,12 +77,10 @@ int8_t SSD16xx_Read_Temp(void)
     return (int8_t)EPD_ReadByte();
 }
 
-static void _setPartialRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+static void _setPartialRamArea(epd_model_t *epd, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
-
     EPD_Write(CMD_ENTRY_MODE, 0x03); // set ram entry mode: x increase, y increase
-    if (EPD->drv->ic == EPD_DRIVER_IC_SSD1677) {
+    if (epd->drv->ic == EPD_DRIVER_IC_SSD1677) {
         EPD_Write(CMD_RAM_XPOS,
                   x % 256, x / 256,
                   (x + w - 1) % 256,
@@ -115,10 +113,8 @@ void SSD16xx_Dump_LUT(void)
     NRF_LOG_DEBUG("=== LUT END ===\n");
 }
 
-void SSD16xx_Init()
+void SSD16xx_Init(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
     EPD_Reset(HIGH, 10);
 
     EPD_WriteCmd(CMD_SW_RESET);
@@ -127,51 +123,47 @@ void SSD16xx_Init()
     EPD_Write(CMD_BORDER_CTRL, 0x01);
     EPD_Write(CMD_TSENSOR_CTRL, 0x80);
 
-    _setPartialRamArea(0, 0, EPD->width, EPD->height);
+    _setPartialRamArea(epd, 0, 0, epd->width, epd->height);
 }
 
-static void SSD16xx_Refresh(void)
+static void SSD16xx_Refresh(epd_model_t *epd)
 {
-    epd_model_t *EPD = epd_get();
-
-    EPD_Write(CMD_DISP_CTRL1, EPD->color == BWR ? 0x80 : 0x40, 0x00);
+    EPD_Write(CMD_DISP_CTRL1, epd->color == BWR ? 0x80 : 0x40, 0x00);
 
     NRF_LOG_DEBUG("[EPD]: refresh begin\n");
-    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", SSD16xx_Read_Temp());
+    NRF_LOG_DEBUG("[EPD]: temperature: %d\n", SSD16xx_Read_Temp(epd));
     SSD16xx_Update(0xF7);
     SSD16xx_WaitBusy(30000);
     NRF_LOG_DEBUG("[EPD]: refresh end\n");
 
 //    SSD16xx_Dump_LUT();
 
-    _setPartialRamArea(0, 0, EPD->width, EPD->height); // DO NOT REMOVE!
+    _setPartialRamArea(epd, 0, 0, epd->width, epd->height); // DO NOT REMOVE!
     SSD16xx_Update(0x83);                              // power off
 }
 
-void SSD16xx_Clear(bool refresh)
+void SSD16xx_Clear(epd_model_t *epd, bool refresh)
 {
-    epd_model_t *EPD = epd_get();
-    uint32_t ram_bytes = ((EPD->width + 7) / 8) * EPD->height;
+    uint32_t ram_bytes = ((epd->width + 7) / 8) * epd->height;
 
-    _setPartialRamArea(0, 0, EPD->width, EPD->height);
+    _setPartialRamArea(epd, 0, 0, epd->width, epd->height);
 
     EPD_FillRAM(CMD_WRITE_RAM1, 0xFF, ram_bytes);
     EPD_FillRAM(CMD_WRITE_RAM2, 0xFF, ram_bytes);
 
     if (refresh)
-        SSD16xx_Refresh();
+        SSD16xx_Refresh(epd);
 }
 
-void SSD16xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void SSD16xx_Write_Image(epd_model_t *epd, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
-    epd_model_t *EPD = epd_get();
     uint16_t wb = (w + 7) / 8; // width bytes, bitmaps are padded
     x -= x % 8;                // byte boundary
     w = wb * 8;                // byte boundary
-    if (x + w > EPD->width || y + h > EPD->height)
+    if (x + w > epd->width || y + h > epd->height)
         return;
 
-    _setPartialRamArea(x, y, w, h);
+    _setPartialRamArea(epd, x, y, w, h);
     EPD_WriteCmd(CMD_WRITE_RAM1);
     for (uint16_t i = 0; i < h; i++)
     {
@@ -183,7 +175,7 @@ void SSD16xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     {
         for (uint16_t j = 0; j < w / 8; j++)
         {
-            if (EPD->color == BWR)
+            if (epd->color == BWR)
                 EPD_WriteByte(color ? color[j + i * wb] : 0xFF);
             else
                 EPD_WriteByte(black[j + i * wb]);
@@ -191,13 +183,12 @@ void SSD16xx_Write_Image(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y,
     }
 }
 
-void SSD16xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
+void SSD16xx_Write_Ram(epd_model_t *epd, uint8_t cfg, uint8_t *data, uint8_t len)
 {
     bool begin = (cfg >> 4) == 0x00;
     bool black = (cfg & 0x0F) == 0x0F;
     if (begin) {
-        epd_model_t *EPD = epd_get();
-        if (EPD->color == BWR)
+        if (epd->color == BWR)
             EPD_WriteCmd(black ? CMD_WRITE_RAM1 : CMD_WRITE_RAM2);
         else
             EPD_WriteCmd(CMD_WRITE_RAM1);
@@ -205,7 +196,7 @@ void SSD16xx_Write_Ram(uint8_t cfg, uint8_t *data, uint8_t len)
     EPD_WriteData(data, len);
 }
 
-void SSD16xx_Sleep(void)
+void SSD16xx_Sleep(epd_model_t *epd)
 {
     EPD_Write(CMD_SLEEP_MODE, 0x01);
     delay(100);

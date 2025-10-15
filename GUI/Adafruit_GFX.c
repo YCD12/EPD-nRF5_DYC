@@ -130,7 +130,7 @@ void GFX_firstPage(Adafruit_GFX *gfx) {
   gfx->current_page = 0;
 }
 
-bool GFX_nextPage(Adafruit_GFX *gfx, buffer_callback callback) {
+bool GFX_nextPage(Adafruit_GFX *gfx, buffer_callback callback, void *user_data) {
   if (callback) {
     int16_t page_ys = gfx->current_page * gfx->page_height;
     if (gfx->px != 0 || gfx->py != 0 || gfx->pw != gfx->_width || gfx->ph != gfx->_height) {
@@ -138,10 +138,10 @@ bool GFX_nextPage(Adafruit_GFX *gfx, buffer_callback callback) {
       uint16_t dest_ys = gfx->py + page_ys; // transposed
       uint16_t dest_ye = MIN(gfx->py + gfx->ph, gfx->py + page_ye);
       if (dest_ye > dest_ys)
-        callback(gfx->buffer, gfx->color, gfx->px, dest_ys, gfx->pw, dest_ye - dest_ys);
+        callback(user_data, gfx->buffer, gfx->color, gfx->px, dest_ys, gfx->pw, dest_ye - dest_ys);
     } else {
       int16_t height = MIN(gfx->page_height, gfx->HEIGHT - page_ys);
-      callback(gfx->buffer, gfx->color, 0, page_ys, gfx->WIDTH, height);
+      callback(user_data, gfx->buffer, gfx->color, 0, page_ys, gfx->WIDTH, height);
     }
   }
 

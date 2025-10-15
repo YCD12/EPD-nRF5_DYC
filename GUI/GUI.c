@@ -420,7 +420,7 @@ static void DrawClock(Adafruit_GFX *gfx, tm_t *tm, struct Lunar_Date *Lunar, gui
     }
 }
 
-void DrawGUI(gui_data_t *data, buffer_callback draw, display_mode_t mode)
+void DrawGUI(gui_data_t *data, buffer_callback callback, void *callback_data)
 {
     if (data->week_start > 6) data->week_start = 0;
 
@@ -445,7 +445,7 @@ void DrawGUI(gui_data_t *data, buffer_callback draw, display_mode_t mode)
 
         LUNAR_SolarToLunar(&Lunar, tm.tm_year + YEAR0, tm.tm_mon + 1, tm.tm_mday);
 
-        switch (mode) {
+        switch (data->mode) {
             case MODE_CALENDAR:
                 DrawCalendar(&gfx, &tm, &Lunar, data);
                 break;
@@ -455,11 +455,11 @@ void DrawGUI(gui_data_t *data, buffer_callback draw, display_mode_t mode)
             default:
                 break;
         }
-        if ((mode == MODE_CALENDAR || mode == MODE_CLOCK) &&
+        if ((data->mode == MODE_CALENDAR || data->mode == MODE_CLOCK) &&
             (tm.tm_year + YEAR0 == 2025 && tm.tm_mon + 1 == 1)) {
             DrawTimeSyncTip(&gfx, data);
         }
-    } while(GFX_nextPage(&gfx, draw));
+    } while(GFX_nextPage(&gfx, callback, callback_data));
 
     GFX_end(&gfx);
 }

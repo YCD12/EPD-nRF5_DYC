@@ -14,7 +14,7 @@
 #define GFX_GREEN     0x07E0 //   0, 255,   0
 #define GFX_ORANGE    0xFC00 // 255, 128,   0
 
-typedef void (*buffer_callback)(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+typedef void (*buffer_callback)(void *user_data, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 
 typedef enum {
   GFX_ROTATE_0   = 0,
@@ -51,7 +51,7 @@ void GFX_begin_4c(Adafruit_GFX *gfx, int16_t w, int16_t h, int16_t buffer_height
 void GFX_setRotation(Adafruit_GFX *gfx, GFX_Rotate r);
 void GFX_setWindow(Adafruit_GFX *gfx, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void GFX_firstPage(Adafruit_GFX *gfx);
-bool GFX_nextPage(Adafruit_GFX *gfx, buffer_callback callback);
+bool GFX_nextPage(Adafruit_GFX *gfx, buffer_callback callback, void *user_data);
 void GFX_end(Adafruit_GFX *gfx);
 
 // DRAW API

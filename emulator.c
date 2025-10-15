@@ -23,7 +23,7 @@ time_t g_display_time;
 struct tm g_tm_time;
 
 // Implementation of the buffer_callback function
-void DrawBitmap(uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+void DrawBitmap(void *user_data, uint8_t *black, uint8_t *color, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
     HDC hdc = g_paintHDC;
     if (!hdc) return;
     
@@ -228,6 +228,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             
             // Use the stored timestamp
             gui_data_t data = {
+                .mode            = g_display_mode,
                 .color           = g_bwr_mode ? 2 : 1,
                 .width           = BITMAP_WIDTH,
                 .height          = BITMAP_HEIGHT,
@@ -239,7 +240,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             };
             
             // Call DrawGUI to render the interface
-            DrawGUI(&data, DrawBitmap, g_display_mode);
+            DrawGUI(&data, DrawBitmap, NULL);
             
             // Clear the global HDC
             g_paintHDC = NULL;

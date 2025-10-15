@@ -17,9 +17,6 @@ static uint32_t EPD_BS_PIN = 13;
 static uint32_t EPD_EN_PIN = 0xFF;
 static uint32_t EPD_LED_PIN = 0xFF;
 
-// EPD model
-static epd_model_t *EPD = NULL;
-
 #define SPI_INSTANCE  0 /**< SPI instance index. */
 static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);  /**< SPI instance. */
 
@@ -343,19 +340,15 @@ static epd_model_t *epd_models[] = {
     &epd_jd79668_420,
 };
 
-epd_model_t *epd_get(void)
-{
-    return EPD == NULL ? epd_models[0] : EPD;
-}
-
 epd_model_t *epd_init(epd_model_id_t id)
 {
+    epd_model_t *epd = NULL;
     for (uint8_t i = 0; i < ARRAY_SIZE(epd_models); i++) {
         if (epd_models[i]->id == id) {
-            EPD = epd_models[i];
+            epd = epd_models[i];
         }
     }
-    if (EPD == NULL) EPD = epd_models[0];
-    EPD->drv->init();
-    return EPD;
+    if (epd == NULL) epd = epd_models[0];
+    epd->drv->init(epd);
+    return epd;
 }

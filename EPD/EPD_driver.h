@@ -52,6 +52,7 @@ typedef enum
     EPD_UC8159_750_LOW_BWR = 9,
     EPD_SSD1677_750_HD_BW = 10,
     EPD_SSD1677_750_HD_BWR = 11,
+    EPD_JD79668_750_BWRY = 12,
 } epd_model_id_t;
 
 struct epd_driver;

@@ -438,10 +438,19 @@ const epd_model_t epd_uc8179_750_bwr = {
 };
 
 // JD79668 400x300 Black/White/Red/Yellow
-const epd_model_t epd_jd79668_420 = {
+const epd_model_t epd_jd79668_420_bwry = {
     .id = EPD_JD79668_420_BWRY,
     .color = BWRY,
     .drv = &epd_drv_jd79668,
     .width = 400,
     .height = 300,
+};
+
+// JD79668 800x480 Black/White/Red/Yellow
+const epd_model_t epd_jd79668_750_bwry = {
+    .id = EPD_JD79668_750_BWRY,
+    .color = BWRY,
+    .drv = &epd_drv_jd79668,
+    .width = 800,
+    .height = 480,
 };

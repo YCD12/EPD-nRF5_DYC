@@ -135,19 +135,21 @@ static void DrawTimeSyncTip(Adafruit_GFX *gfx, gui_data_t *data)
     const char *title = "SYNC TIME!";
     const char *url = "https://ycd12.github.io/EPD-nRF5_DYC/";
 
+    GFX_setFont(gfx, u8g2_font_wqy9_t_lunar);
+
+    int16_t fh = GFX_getFontHeight(gfx);
     int16_t box_w = GFX_getUTF8Width(gfx, url) + 20;
-    int16_t box_h = 50;
+    int16_t box_h = fh * 2 + 20;
     int16_t box_x = (data->width - box_w) / 2;
     int16_t box_y = data->height / 2 - box_h / 2;
 
-    GFX_setFont(gfx, u8g2_font_wqy9_t_lunar);
     GFX_fillRect(gfx, box_x, box_y, box_w, box_h, GFX_WHITE);
     GFX_drawRoundRect(gfx, box_x, box_y, box_w, box_h, 5, GFX_BLACK);
     GFX_setTextColor(gfx, GFX_RED, GFX_WHITE);
-    GFX_setCursor(gfx, box_x + (box_w - GFX_getUTF8Width(gfx, title)) / 2, box_y + 20);
+    GFX_setCursor(gfx, box_x + (box_w - GFX_getUTF8Width(gfx, title)) / 2, box_y + 5 + fh);
     GFX_printf(gfx, title);
     GFX_setTextColor(gfx, GFX_BLACK, GFX_WHITE);
-    GFX_setCursor(gfx, box_x + 10, box_y + 35);
+    GFX_setCursor(gfx, box_x + 10, box_y + box_h - GFX_getFontAscent(gfx));
     GFX_printf(gfx, url);
 }
 

@@ -19,6 +19,32 @@
 2. 切换到 `flash_softdevice`，下载蓝牙协议栈，**不要编译直接下载**（只需刷一次）
 3. 切换到 `nRF51822_xxAA`，先编译再下载
 
+### 晶振配置
+
+本项目默认都没有使用外部低速晶振 (频率: `32.768kHz`)，因为不是所有的板子都有这个晶振，没有低速晶振的板子刷了开启低速晶振的固件是运行不起来的。
+如果你的板子有外部低速晶振，建议修改为使用外部晶振，这样时钟走时会更准确一些。以下是修改方法：
+
+**nRF51**
+
+修改 `main.c`:
+
+```c
+#define NRF_CLOCK_LFCLKSRC      {.source        = NRF_CLOCK_LF_SRC_XTAL,             \
+                                 .rc_ctiv       = 0,                                 \
+                                 .rc_temp_ctiv  = 0,                                 \
+                                 .xtal_accuracy = NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM}
+```
+**nRF52**
+
+修改 `sdk_config.h`:
+
+```c
+#define NRF_SDH_CLOCK_LF_SRC 1
+#define NRF_SDH_CLOCK_LF_RC_CTIV 0
+#define NRF_SDH_CLOCK_LF_RC_TEMP_CTIV 0
+#define NRF_SDH_CLOCK_LF_ACCURACY 7
+```
+
 ### 模拟器
 
 本项目提供了一个可在 Windows 下运行界面代码的模拟器，修改了界面代码后无需下载到单片机即可查看效果。

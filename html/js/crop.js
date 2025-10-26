@@ -93,6 +93,7 @@ function finishCrop() {
     convertDithering();
 
     exitCropMode();
+    saveToHistory(); // Save after finishing crop
   };
   image.src = URL.createObjectURL(imageFile.files[0]);
 }

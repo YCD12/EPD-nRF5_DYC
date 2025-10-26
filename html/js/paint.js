@@ -15,11 +15,81 @@ let dragOffsetY = 0;
 let textBold = false; // Track if text should be bold
 let textItalic = false; // Track if text should be italic
 
+// Undo/Redo functionality
+let historyStack = []; // Stack to store canvas history
+let historyStep = -1; // Current position in history stack
+const MAX_HISTORY = 50; // Maximum number of undo steps
+
 function setCanvasTitle(title) {
   const canvasTitle = document.querySelector('.canvas-title');
   if (canvasTitle) {
     canvasTitle.innerText = title;
     canvasTitle.style.display = title && title !== '' ? 'block' : 'none';
+  }
+}
+
+function saveToHistory() {
+  // Remove any states after current step (when user drew something after undoing)
+  historyStack = historyStack.slice(0, historyStep + 1);
+  
+  // Save current canvas state along with text and line data
+  const canvasState = {
+    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+    textElements: JSON.parse(JSON.stringify(textElements)),
+    lineSegments: JSON.parse(JSON.stringify(lineSegments))
+  };
+  
+  historyStack.push(canvasState);
+  historyStep++;
+  
+  // Limit history size
+  if (historyStack.length > MAX_HISTORY) {
+    historyStack.shift();
+    historyStep--;
+  }
+  
+  updateUndoRedoButtons();
+}
+
+function undo() {
+  if (historyStep > 0) {
+    historyStep--;
+    restoreFromHistory();
+  }
+}
+
+function redo() {
+  if (historyStep < historyStack.length - 1) {
+    historyStep++;
+    restoreFromHistory();
+  }
+}
+
+function restoreFromHistory() {
+  if (historyStep >= 0 && historyStep < historyStack.length) {
+    const state = historyStack[historyStep];
+    
+    // Restore canvas image
+    ctx.putImageData(state.imageData, 0, 0);
+    
+    // Restore text and line data
+    textElements = JSON.parse(JSON.stringify(state.textElements));
+    lineSegments = JSON.parse(JSON.stringify(state.lineSegments));
+    
+    updateUndoRedoButtons();
+  }
+}
+
+function updateUndoRedoButtons() {
+  const undoBtn = document.getElementById('undo-btn');
+  const redoBtn = document.getElementById('redo-btn');
+  
+  if (undoBtn) {
+    undoBtn.disabled = historyStep <= 0;
+  }
+  
+  if (redoBtn) {
+    redoBtn.disabled = historyStep >= historyStack.length - 1;
   }
 }
 
@@ -71,6 +141,10 @@ function initPaintTools() {
     textItalic = !textItalic;
     document.getElementById('text-italic').classList.toggle('primary', textItalic);
   });
+
+  // Add undo/redo button listeners
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
   
   canvas.addEventListener('mousedown', startPaint);
   canvas.addEventListener('mousemove', paint);
@@ -82,6 +156,23 @@ function initPaintTools() {
   canvas.addEventListener('touchstart', onTouchStart);
   canvas.addEventListener('touchmove', onTouchMove);
   canvas.addEventListener('touchend', onTouchEnd);
+  
+  // Keyboard shortcuts for undo/redo
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Z or Cmd+Z for undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    }
+    // Ctrl+Y or Ctrl+Shift+Z or Cmd+Shift+Z for redo
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+      e.preventDefault();
+      redo();
+    }
+  });
+  
+  // Initialize history with blank canvas state
+  saveToHistory();
 }
 
 function setActiveTool(tool, title) {
@@ -98,6 +189,9 @@ function setActiveTool(tool, title) {
 
   document.getElementById('brush-color').disabled = currentTool === 'eraser';
   document.getElementById('brush-size').disabled = currentTool === 'text';
+
+  document.getElementById('undo-btn').classList.toggle('hide', currentTool === null);
+  document.getElementById('redo-btn').classList.toggle('hide', currentTool === null);
 
   // Cancel any pending text placement
   cancelTextPlacement();
@@ -131,6 +225,9 @@ function startPaint(e) {
 }
 
 function endPaint() {
+  if (painting || isDraggingText) {
+    saveToHistory(); // Save state after drawing or dragging text
+  }
   painting = false;
   isDraggingText = false;
   lastX = 0;
@@ -363,6 +460,9 @@ function placeText(e) {
   ctx.font = newText.font;
   ctx.fillStyle = newText.color;
   ctx.fillText(newText.text, newText.x, newText.y);
+  
+  // Save to history after placing text
+  saveToHistory();
   
   // Reset
   document.getElementById('text-input').value = '';

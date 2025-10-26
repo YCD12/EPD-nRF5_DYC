@@ -419,6 +419,10 @@ canvas.text-placement-mode {
     border-color: var(--primary-color);
 }
 
+.tool-button.hide {
+    display: none;
+}
+
 body.debug-mode .tool-button {
     background-color: var(--dark-input-bg);
     border-color: var(--dark-border);

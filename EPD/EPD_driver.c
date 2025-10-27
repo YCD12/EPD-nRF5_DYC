@@ -1,6 +1,7 @@
+#include "EPD_driver.h"
+
 #include "app_error.h"
 #include "nrf_drv_spi.h"
-#include "EPD_driver.h"
 #include "nrf_log.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
@@ -17,26 +18,22 @@ static uint32_t EPD_BS_PIN = 13;
 static uint32_t EPD_EN_PIN = 0xFF;
 static uint32_t EPD_LED_PIN = 0xFF;
 
-#define SPI_INSTANCE  0 /**< SPI instance index. */
-static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);  /**< SPI instance. */
+#define SPI_INSTANCE 0                                               /**< SPI instance index. */
+static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE); /**< SPI instance. */
 
 #if defined(S112)
 #define HAL_SPI_INSTANCE spi.u.spi.p_reg
 #else
 #define HAL_SPI_INSTANCE spi.p_registers
-nrf_gpio_pin_dir_t nrf_gpio_pin_dir_get(uint32_t pin)
-{
-    NRF_GPIO_Type * reg = nrf_gpio_pin_port_decode(&pin);
-    return (nrf_gpio_pin_dir_t)((reg->PIN_CNF[pin] &
-                                 GPIO_PIN_CNF_DIR_Msk) >> GPIO_PIN_CNF_DIR_Pos);
+nrf_gpio_pin_dir_t nrf_gpio_pin_dir_get(uint32_t pin) {
+    NRF_GPIO_Type* reg = nrf_gpio_pin_port_decode(&pin);
+    return (nrf_gpio_pin_dir_t)((reg->PIN_CNF[pin] & GPIO_PIN_CNF_DIR_Msk) >> GPIO_PIN_CNF_DIR_Pos);
 }
 #endif
 
 // Arduino like function wrappers
-void pinMode(uint32_t pin, uint32_t mode)
-{
-    switch (mode)
-    {
+void pinMode(uint32_t pin, uint32_t mode) {
+    switch (mode) {
         case INPUT:
             nrf_gpio_cfg_input(pin, NRF_GPIO_PIN_NOPULL);
             break;
@@ -59,8 +56,7 @@ void pinMode(uint32_t pin, uint32_t mode)
 // GPIO
 static uint16_t m_driver_refs = 0;
 
-void EPD_GPIO_Load(epd_config_t *cfg)
-{
+void EPD_GPIO_Load(epd_config_t* cfg) {
     if (cfg == NULL) return;
     EPD_MOSI_PIN = cfg->mosi_pin;
     EPD_SCLK_PIN = cfg->sclk_pin;
@@ -73,8 +69,7 @@ void EPD_GPIO_Load(epd_config_t *cfg)
     EPD_LED_PIN = cfg->led_pin;
 }
 
-void EPD_GPIO_Init(void)
-{
+void EPD_GPIO_Init(void) {
     if (m_driver_refs++ > 0) return;
 
     pinMode(EPD_DC_PIN, OUTPUT);
@@ -103,14 +98,12 @@ void EPD_GPIO_Init(void)
     digitalWrite(EPD_DC_PIN, LOW);
     digitalWrite(EPD_RST_PIN, HIGH);
 
-    if (EPD_LED_PIN != 0xFF)
-        pinMode(EPD_LED_PIN, OUTPUT);
+    if (EPD_LED_PIN != 0xFF) pinMode(EPD_LED_PIN, OUTPUT);
 
     EPD_LED_ON();
 }
 
-void EPD_GPIO_Uninit(void)
-{
+void EPD_GPIO_Uninit(void) {
     if (--m_driver_refs > 0) return;
 
     EPD_LED_OFF();
@@ -120,8 +113,7 @@ void EPD_GPIO_Uninit(void)
     digitalWrite(EPD_DC_PIN, LOW);
     digitalWrite(EPD_CS_PIN, LOW);
     digitalWrite(EPD_RST_PIN, LOW);
-    if (EPD_EN_PIN != 0xFF)
-        digitalWrite(EPD_EN_PIN, LOW);
+    if (EPD_EN_PIN != 0xFF) digitalWrite(EPD_EN_PIN, LOW);
 
     // reset pin state
     pinMode(EPD_MOSI_PIN, DEFAULT);
@@ -136,8 +128,7 @@ void EPD_GPIO_Uninit(void)
 }
 
 // SPI
-void EPD_SPI_Write(uint8_t *value, uint8_t len)
-{
+void EPD_SPI_Write(uint8_t* value, uint8_t len) {
     nrf_gpio_pin_dir_t dir = nrf_gpio_pin_dir_get(EPD_MOSI_PIN);
     if (dir != NRF_GPIO_PIN_DIR_OUTPUT) {
         pinMode(EPD_MOSI_PIN, OUTPUT);
@@ -146,8 +137,7 @@ void EPD_SPI_Write(uint8_t *value, uint8_t len)
     APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, value, len, NULL, 0));
 }
 
-void EPD_SPI_Read(uint8_t *value, uint8_t len)
-{
+void EPD_SPI_Read(uint8_t* value, uint8_t len) {
     nrf_gpio_pin_dir_t dir = nrf_gpio_pin_dir_get(EPD_MOSI_PIN);
     if (dir != NRF_GPIO_PIN_DIR_INPUT) {
         pinMode(EPD_MOSI_PIN, INPUT);
@@ -157,43 +147,36 @@ void EPD_SPI_Read(uint8_t *value, uint8_t len)
 }
 
 // EPD
-void EPD_WriteCmd(uint8_t cmd)
-{
+void EPD_WriteCmd(uint8_t cmd) {
     digitalWrite(EPD_DC_PIN, LOW);
     EPD_SPI_Write(&cmd, 1);
 }
 
-void EPD_WriteData(uint8_t *value, uint8_t len)
-{
+void EPD_WriteData(uint8_t* value, uint8_t len) {
     digitalWrite(EPD_DC_PIN, HIGH);
     EPD_SPI_Write(value, len);
 }
 
-void EPD_ReadData(uint8_t *value, uint8_t len)
-{
+void EPD_ReadData(uint8_t* value, uint8_t len) {
     digitalWrite(EPD_DC_PIN, HIGH);
     EPD_SPI_Read(value, len);
 }
 
-void EPD_WriteByte(uint8_t value)
-{
+void EPD_WriteByte(uint8_t value) {
     digitalWrite(EPD_DC_PIN, HIGH);
     EPD_SPI_Write(&value, 1);
 }
 
-uint8_t EPD_ReadByte(void)
-{
+uint8_t EPD_ReadByte(void) {
     uint8_t value;
     digitalWrite(EPD_DC_PIN, HIGH);
     EPD_SPI_Read(&value, 1);
     return value;
 }
 
-void EPD_FillRAM(uint8_t cmd, uint8_t value, uint32_t len)
-{
+void EPD_FillRAM(uint8_t cmd, uint8_t value, uint32_t len) {
     uint8_t buffer[BUFFER_SIZE];
-    for (uint8_t i = 0; i < BUFFER_SIZE; i++)
-        buffer[i] = value;
+    for (uint8_t i = 0; i < BUFFER_SIZE; i++) buffer[i] = value;
 
     EPD_WriteCmd(cmd);
     uint16_t remaining = len;
@@ -204,8 +187,7 @@ void EPD_FillRAM(uint8_t cmd, uint8_t value, uint32_t len)
     }
 }
 
-void EPD_Reset(uint32_t value, uint16_t duration)
-{
+void EPD_Reset(uint32_t value, uint16_t duration) {
     digitalWrite(EPD_RST_PIN, value);
     delay(duration);
     digitalWrite(EPD_RST_PIN, (value == LOW) ? HIGH : LOW);
@@ -214,8 +196,7 @@ void EPD_Reset(uint32_t value, uint16_t duration)
     delay(duration);
 }
 
-void EPD_WaitBusy(uint32_t value, uint16_t timeout)
-{
+void EPD_WaitBusy(uint32_t value, uint16_t timeout) {
     uint32_t led_status = digitalRead(EPD_LED_PIN);
 
     NRF_LOG_DEBUG("[EPD]: check busy\n");
@@ -238,26 +219,19 @@ void EPD_WaitBusy(uint32_t value, uint16_t timeout)
 }
 
 // lED
-void EPD_LED_ON(void)
-{
-    if (EPD_LED_PIN != 0xFF)
-        digitalWrite(EPD_LED_PIN, LOW);
+void EPD_LED_ON(void) {
+    if (EPD_LED_PIN != 0xFF) digitalWrite(EPD_LED_PIN, LOW);
 }
 
-void EPD_LED_OFF(void)
-{
-    if (EPD_LED_PIN != 0xFF)
-        digitalWrite(EPD_LED_PIN, HIGH);
+void EPD_LED_OFF(void) {
+    if (EPD_LED_PIN != 0xFF) digitalWrite(EPD_LED_PIN, HIGH);
 }
 
-void EPD_LED_Toggle(void)
-{
-    if (EPD_LED_PIN != 0xFF)
-        nrf_gpio_pin_toggle(EPD_LED_PIN);
+void EPD_LED_Toggle(void) {
+    if (EPD_LED_PIN != 0xFF) nrf_gpio_pin_toggle(EPD_LED_PIN);
 }
 
-void EPD_LED_BLINK(void)
-{
+void EPD_LED_BLINK(void) {
     if (EPD_LED_PIN != 0xFF) {
         pinMode(EPD_LED_PIN, OUTPUT);
         digitalWrite(EPD_LED_PIN, LOW);
@@ -268,18 +242,18 @@ void EPD_LED_BLINK(void)
     }
 }
 
-float EPD_ReadVoltage(void)
-{
+float EPD_ReadVoltage(void) {
 #if defined(S112)
     volatile int16_t value = 0;
     NRF_SAADC->RESOLUTION = SAADC_RESOLUTION_VAL_10bit;
     NRF_SAADC->ENABLE = (SAADC_ENABLE_ENABLE_Enabled << SAADC_ENABLE_ENABLE_Pos);
-    NRF_SAADC->CH[0].CONFIG = ((SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESP_Pos)   & SAADC_CH_CONFIG_RESP_Msk)
-                            | ((SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESN_Pos)   & SAADC_CH_CONFIG_RESN_Msk)
-                            | ((SAADC_CH_CONFIG_GAIN_Gain1_6    << SAADC_CH_CONFIG_GAIN_Pos)   & SAADC_CH_CONFIG_GAIN_Msk)
-                            | ((SAADC_CH_CONFIG_REFSEL_Internal << SAADC_CH_CONFIG_REFSEL_Pos) & SAADC_CH_CONFIG_REFSEL_Msk)
-                            | ((SAADC_CH_CONFIG_TACQ_3us        << SAADC_CH_CONFIG_TACQ_Pos)   & SAADC_CH_CONFIG_TACQ_Msk)
-                            | ((SAADC_CH_CONFIG_MODE_SE         << SAADC_CH_CONFIG_MODE_Pos)   & SAADC_CH_CONFIG_MODE_Msk);
+    NRF_SAADC->CH[0].CONFIG =
+        ((SAADC_CH_CONFIG_RESP_Bypass << SAADC_CH_CONFIG_RESP_Pos) & SAADC_CH_CONFIG_RESP_Msk) |
+        ((SAADC_CH_CONFIG_RESP_Bypass << SAADC_CH_CONFIG_RESN_Pos) & SAADC_CH_CONFIG_RESN_Msk) |
+        ((SAADC_CH_CONFIG_GAIN_Gain1_6 << SAADC_CH_CONFIG_GAIN_Pos) & SAADC_CH_CONFIG_GAIN_Msk) |
+        ((SAADC_CH_CONFIG_REFSEL_Internal << SAADC_CH_CONFIG_REFSEL_Pos) & SAADC_CH_CONFIG_REFSEL_Msk) |
+        ((SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) & SAADC_CH_CONFIG_TACQ_Msk) |
+        ((SAADC_CH_CONFIG_MODE_SE << SAADC_CH_CONFIG_MODE_Pos) & SAADC_CH_CONFIG_MODE_Msk);
     NRF_SAADC->CH[0].PSELN = SAADC_CH_PSELN_PSELN_NC;
     NRF_SAADC->CH[0].PSELP = SAADC_CH_PSELP_PSELP_VDD;
     NRF_SAADC->RESULT.PTR = (uint32_t)&value;
@@ -303,7 +277,7 @@ float EPD_ReadVoltage(void)
                       (ADC_CONFIG_PSEL_Disabled << ADC_CONFIG_PSEL_Pos) |
                       (ADC_CONFIG_EXTREFSEL_None << ADC_CONFIG_EXTREFSEL_Pos);
     NRF_ADC->TASKS_START = 1;
-    while(!NRF_ADC->EVENTS_END);
+    while (!NRF_ADC->EVENTS_END);
     NRF_ADC->EVENTS_END = 0;
     uint16_t value = NRF_ADC->RESULT;
     NRF_ADC->TASKS_STOP = 1;
@@ -327,24 +301,14 @@ extern epd_model_t epd_ssd1677_750_bw;
 extern epd_model_t epd_jd79668_420_bwry;
 extern epd_model_t epd_jd79668_750_bwry;
 
-static epd_model_t *epd_models[] = {
-    &epd_uc8176_420_bw,
-    &epd_uc8176_420_bwr,
-    &epd_uc8159_750_bw,
-    &epd_uc8159_750_bwr,
-    &epd_uc8179_750_bw,
-    &epd_uc8179_750_bwr,
-    &epd_ssd1619_420_bwr,
-    &epd_ssd1619_420_bw,
-    &epd_ssd1677_750_bwr,
-    &epd_ssd1677_750_bw,
-    &epd_jd79668_420_bwry,
-    &epd_jd79668_750_bwry,
+static epd_model_t* epd_models[] = {
+    &epd_uc8176_420_bw,   &epd_uc8176_420_bwr, &epd_uc8159_750_bw,    &epd_uc8159_750_bwr,
+    &epd_uc8179_750_bw,   &epd_uc8179_750_bwr, &epd_ssd1619_420_bwr,  &epd_ssd1619_420_bw,
+    &epd_ssd1677_750_bwr, &epd_ssd1677_750_bw, &epd_jd79668_420_bwry, &epd_jd79668_750_bwry,
 };
 
-epd_model_t *epd_init(epd_model_id_t id)
-{
-    epd_model_t *epd = NULL;
+epd_model_t* epd_init(epd_model_id_t id) {
+    epd_model_t* epd = NULL;
     for (uint8_t i = 0; i < ARRAY_SIZE(epd_models); i++) {
         if (epd_models[i]->id == id) {
             epd = epd_models[i];

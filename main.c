@@ -12,41 +12,42 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "nordic_common.h"
-#include "nrf.h"
+
 #include "ble.h"
-#include "ble_hci.h"
-#include "ble_srv_common.h"
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_params.h"
 #include "ble_dfu.h"
+#include "ble_hci.h"
+#include "ble_srv_common.h"
+#include "nordic_common.h"
+#include "nrf.h"
 #if defined(S112)
-#include "nrf_sdh.h"
-#include "nrf_sdh_soc.h"
-#include "nrf_sdh_ble.h"
 #include "nrf_ble_gatt.h"
 #include "nrf_bootloader_info.h"
+#include "nrf_sdh.h"
+#include "nrf_sdh_ble.h"
+#include "nrf_sdh_soc.h"
 #else
 #include "fstorage.h"
 #include "softdevice_handler.h"
 #endif
-#include "nrf_power.h"
+#include "EPD_service.h"
 #include "app_error.h"
-#include "app_timer.h"
 #include "app_scheduler.h"
+#include "app_timer.h"
+#include "main.h"
 #include "nrf_drv_gpiote.h"
 #include "nrf_drv_wdt.h"
-#include "nrf_pwr_mgmt.h"
-#include "EPD_service.h"
-#include "main.h"
-
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
+#include "nrf_power.h"
+#include "nrf_pwr_mgmt.h"
 #if defined(S112)
 #include "nrf_log_default_backends.h"
 #endif
 
+// clang-format off
 #define CENTRAL_LINK_COUNT              0                                               /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
 #define PERIPHERAL_LINK_COUNT           1                                               /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
@@ -100,6 +101,7 @@ APP_TIMER_DEF(m_clock_timer_id);                                                
 static nrf_drv_wdt_channel_id            m_wdt_channel_id;
 static uint32_t                          m_wdt_last_feed_time = 0;
 static uint32_t                          m_resetreas;
+// clang-format on
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -112,28 +114,22 @@ static uint32_t                          m_resetreas;
  * @param[in] line_num   Line number of the failing ASSERT call.
  * @param[in] file_name  File name of the failing ASSERT call.
  */
-void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
-{
+void assert_nrf_callback(uint16_t line_num, const uint8_t* p_file_name) {
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
 }
 
 // return current timestamp
-uint32_t timestamp(void)
-{
-    return m_timestamp;
-}
+uint32_t timestamp(void) { return m_timestamp; }
 
 // set the timestamp
-void set_timestamp(uint32_t timestamp)
-{
+void set_timestamp(uint32_t timestamp) {
     app_timer_stop(m_clock_timer_id);
     m_timestamp = timestamp;
     app_timer_start(m_clock_timer_id, CLOCK_TIMER_INTERVAL, NULL);
 }
 
 // reload the wdt channel
-void app_feed_wdt(void)
-{
+void app_feed_wdt(void) {
     if (m_timestamp - m_wdt_last_feed_time >= 30) {
         NRF_LOG_DEBUG("Feed WDT\n");
         nrf_drv_wdt_channel_feed(m_wdt_channel_id);
@@ -142,39 +138,32 @@ void app_feed_wdt(void)
 }
 
 #if defined(S112)
-static void buttonless_dfu_sdh_state_observer(nrf_sdh_state_evt_t state, void * p_context)
-{
-    if (state == NRF_SDH_EVT_STATE_DISABLED)
-    {
+static void buttonless_dfu_sdh_state_observer(nrf_sdh_state_evt_t state, void* p_context) {
+    if (state == NRF_SDH_EVT_STATE_DISABLED) {
         // Softdevice was disabled before going into reset. Inform bootloader to skip CRC on next boot.
         nrf_power_gpregret2_set(BOOTLOADER_DFU_SKIP_CRC);
 
-        //Go to system off.
+        // Go to system off.
         nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
     }
 }
 
 /* nrf_sdh state observer. */
-NRF_SDH_STATE_OBSERVER(m_buttonless_dfu_state_obs, 0) =
-{
+NRF_SDH_STATE_OBSERVER(m_buttonless_dfu_state_obs, 0) = {
     .handler = buttonless_dfu_sdh_state_observer,
 };
 
-static void advertising_config_get(ble_adv_modes_config_t * p_config)
-{
+static void advertising_config_get(ble_adv_modes_config_t* p_config) {
     memset(p_config, 0, sizeof(ble_adv_modes_config_t));
 
-    p_config->ble_adv_fast_enabled  = true;
+    p_config->ble_adv_fast_enabled = true;
     p_config->ble_adv_fast_interval = APP_ADV_INTERVAL;
-    p_config->ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS * 100;
+    p_config->ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS * 100;
 }
 
-static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event)
-{
-    switch (event)
-    {
-        case BLE_DFU_EVT_BOOTLOADER_ENTER_PREPARE:
-        {
+static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event) {
+    switch (event) {
+        case BLE_DFU_EVT_BOOTLOADER_ENTER_PREPARE: {
             NRF_LOG_INFO("Device is preparing to enter bootloader mode.");
 
             // Prevent device from advertising on disconnect.
@@ -210,10 +199,8 @@ static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event)
     }
 }
 #else
-static void ble_dfu_evt_handler(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
-{
-    switch (p_evt->type)
-    {
+static void ble_dfu_evt_handler(ble_dfu_t* p_dfu, ble_dfu_evt_t* p_evt) {
+    switch (p_evt->type) {
         case BLE_DFU_EVT_INDICATION_DISABLED:
             NRF_LOG_INFO("Indication for BLE_DFU is disabled\r\n");
             break;
@@ -232,8 +219,7 @@ static void ble_dfu_evt_handler(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
 }
 #endif
 
-static void clock_timer_timeout_handler(void * p_context)
-{
+static void clock_timer_timeout_handler(void* p_context) {
     UNUSED_PARAMETER(p_context);
 
     m_timestamp++;
@@ -243,17 +229,13 @@ static void clock_timer_timeout_handler(void * p_context)
 
 /**@brief Function for the Event Scheduler initialization.
  */
-static void scheduler_init(void)
-{
-    APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-}
+static void scheduler_init(void) { APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE); }
 
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module. This creates and starts application timers.
  */
-static void timers_init(void)
-{
+static void timers_init(void) {
     // Initialize timer module.
 #if defined(S112)
     APP_ERROR_CHECK(app_timer_init());
@@ -261,15 +243,12 @@ static void timers_init(void)
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
 #endif
     // Create timers.
-    APP_ERROR_CHECK(app_timer_create(&m_clock_timer_id,
-                                     APP_TIMER_MODE_REPEATED,
-                                     clock_timer_timeout_handler));
+    APP_ERROR_CHECK(app_timer_create(&m_clock_timer_id, APP_TIMER_MODE_REPEATED, clock_timer_timeout_handler));
 }
 
 /**@brief Function for starting application timers.
  */
-static void application_timers_start(void)
-{
+static void application_timers_start(void) {
     // Start application timers.
     APP_ERROR_CHECK(app_timer_start(m_clock_timer_id, CLOCK_TIMER_INTERVAL, NULL));
 }
@@ -278,8 +257,7 @@ static void application_timers_start(void)
  *
  * @note This function will not return.
  */
-void sleep_mode_enter(void)
-{
+void sleep_mode_enter(void) {
     NRF_LOG_DEBUG("Entering deep sleep mode\n");
     NRF_LOG_FINAL_FLUSH();
     nrf_delay_ms(100);
@@ -290,8 +268,7 @@ void sleep_mode_enter(void)
 
 /**@brief Function for initializing services that will be used by the application.
  */
-static void services_init(void)
-{
+static void services_init(void) {
     // Initialize EPD Service.
     memset(&m_epd, 0, sizeof(ble_epd_t));
     APP_ERROR_CHECK(ble_epd_init(&m_epd));
@@ -304,9 +281,9 @@ static void services_init(void)
     // Initialize the Device Firmware Update Service.
     ble_dfu_init_t dfus_init;
     memset(&dfus_init, 0, sizeof(dfus_init));
-    dfus_init.evt_handler                               = ble_dfu_evt_handler;
-    dfus_init.ctrl_point_security_req_write_perm        = SEC_SIGNED;
-    dfus_init.ctrl_point_security_req_cccd_write_perm   = SEC_SIGNED;
+    dfus_init.evt_handler = ble_dfu_evt_handler;
+    dfus_init.ctrl_point_security_req_write_perm = SEC_SIGNED;
+    dfus_init.ctrl_point_security_req_cccd_write_perm = SEC_SIGNED;
     APP_ERROR_CHECK(ble_dfu_init(&m_dfus, &dfus_init));
 #endif
 }
@@ -316,11 +293,10 @@ static void services_init(void)
  * @details This function will set up all the necessary GAP (Generic Access Profile) parameters of
  *          the device. It also sets the permissions and appearance.
  */
-static void gap_params_init(void)
-{
-    char                    device_name[20];
-    ble_gap_addr_t          addr;
-    ble_gap_conn_params_t   gap_conn_params;
+static void gap_params_init(void) {
+    char device_name[20];
+    ble_gap_addr_t addr;
+    ble_gap_conn_params_t gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
@@ -330,21 +306,18 @@ static void gap_params_init(void)
     APP_ERROR_CHECK(sd_ble_gap_address_get(&addr));
 #endif
 
-    NRF_LOG_INFO("Bluetooth MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                   addr.addr[5], addr.addr[4], addr.addr[3],
-                   addr.addr[2], addr.addr[1], addr.addr[0]);
+    NRF_LOG_INFO("Bluetooth MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n", addr.addr[5], addr.addr[4], addr.addr[3],
+                 addr.addr[2], addr.addr[1], addr.addr[0]);
 
-    snprintf(device_name, 20, "%s_%02X%02X", DEVICE_NAME, addr.addr[1],addr.addr[0]);
-    APP_ERROR_CHECK(sd_ble_gap_device_name_set(&sec_mode,
-                                               (const uint8_t *)device_name,
-                                               strlen(device_name)));
+    snprintf(device_name, 20, "%s_%02X%02X", DEVICE_NAME, addr.addr[1], addr.addr[0]);
+    APP_ERROR_CHECK(sd_ble_gap_device_name_set(&sec_mode, (const uint8_t*)device_name, strlen(device_name)));
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
 
     gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
     gap_conn_params.max_conn_interval = MAX_CONN_INTERVAL;
-    gap_conn_params.slave_latency     = SLAVE_LATENCY;
-    gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
+    gap_conn_params.slave_latency = SLAVE_LATENCY;
+    gap_conn_params.conn_sup_timeout = CONN_SUP_TIMEOUT;
 
     APP_ERROR_CHECK(sd_ble_gap_ppcp_set(&gap_conn_params));
 }
@@ -360,48 +333,38 @@ static void gap_params_init(void)
  *
  * @param[in] p_evt  Event received from the Connection Parameters Module.
  */
-static void on_conn_params_evt(ble_conn_params_evt_t * p_evt)
-{
-    if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED)
-    {
+static void on_conn_params_evt(ble_conn_params_evt_t* p_evt) {
+    if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED) {
         APP_ERROR_CHECK(sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE));
     }
 }
-
 
 /**@brief Function for handling errors from the Connection Parameters module.
  *
  * @param[in] nrf_error  Error code containing information about what went wrong.
  */
-static void conn_params_error_handler(uint32_t nrf_error)
-{
-    APP_ERROR_HANDLER(nrf_error);
-}
-
+static void conn_params_error_handler(uint32_t nrf_error) { APP_ERROR_HANDLER(nrf_error); }
 
 /**@brief Function for initializing the Connection Parameters module.
  */
-static void conn_params_init(void)
-{
+static void conn_params_init(void) {
     ble_conn_params_init_t cp_init;
 
     memset(&cp_init, 0, sizeof(cp_init));
 
-    cp_init.p_conn_params                  = NULL;
+    cp_init.p_conn_params = NULL;
     cp_init.first_conn_params_update_delay = FIRST_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
-    cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = false;
-    cp_init.evt_handler                    = on_conn_params_evt;
-    cp_init.error_handler                  = conn_params_error_handler;
+    cp_init.next_conn_params_update_delay = NEXT_CONN_PARAMS_UPDATE_DELAY;
+    cp_init.max_conn_params_update_count = MAX_CONN_PARAMS_UPDATE_COUNT;
+    cp_init.start_on_notify_cccd_handle = BLE_GATT_HANDLE_INVALID;
+    cp_init.disconnect_on_fail = false;
+    cp_init.evt_handler = on_conn_params_evt;
+    cp_init.error_handler = conn_params_error_handler;
 
     APP_ERROR_CHECK(ble_conn_params_init(&cp_init));
 }
 
-
-static void advertising_start(void)
-{
+static void advertising_start(void) {
     NRF_LOG_INFO("advertising start\n");
 #if defined(S112)
     APP_ERROR_CHECK(ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST));
@@ -432,17 +395,14 @@ static void setup_wakeup_pin(nrf_drv_gpiote_pin_t pin) {
     nrf_drv_gpiote_in_event_enable(pin, true);
 }
 
-
 /**@brief Function for handling advertising events.
  *
  * @details This function will be called for advertising events which are passed to the application.
  *
  * @param[in] ble_adv_evt  Advertising event.
  */
-static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
-{
-    switch (ble_adv_evt)
-    {
+static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
+    switch (ble_adv_evt) {
         case BLE_ADV_EVT_FAST:
             break;
         case BLE_ADV_EVT_IDLE:
@@ -465,10 +425,8 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
  *
  * @param[in] p_ble_evt SoftDevice event.
  */
-static void on_ble_evt(ble_evt_t * p_ble_evt)
-{
-    switch (p_ble_evt->header.evt_id)
-    {
+static void on_ble_evt(ble_evt_t* p_ble_evt) {
+    switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("CONNECTED\n");
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
@@ -482,11 +440,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 #endif
             break;
 #if defined(S112)
-        case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
-        {
+        case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
             NRF_LOG_DEBUG("PHY update request.");
-            ble_gap_phys_t const phys =
-            {
+            ble_gap_phys_t const phys = {
                 .rx_phys = BLE_GAP_PHY_AUTO,
                 .tx_phys = BLE_GAP_PHY_AUTO,
             };
@@ -496,24 +452,25 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
             // Pairing not supported
-            APP_ERROR_CHECK(sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL));
+            APP_ERROR_CHECK(
+                sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL));
             break;
 
         case BLE_GATTS_EVT_SYS_ATTR_MISSING:
             // No system attributes have been stored.
             APP_ERROR_CHECK(sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0));
             break;
-        
+
         case BLE_GATTC_EVT_TIMEOUT:
             // Disconnect on GATT Client timeout event.
-            APP_ERROR_CHECK(sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
-                                                  BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION));
+            APP_ERROR_CHECK(
+                sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION));
             break;
 
         case BLE_GATTS_EVT_TIMEOUT:
             // Disconnect on GATT Server timeout event.
-            APP_ERROR_CHECK(sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
-                                                  BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION));
+            APP_ERROR_CHECK(
+                sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION));
             break;
 
         default:
@@ -522,18 +479,16 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     }
 }
 
-
 #if defined(S112)
 /**@brief Function for handling BLE events.
  *
  * @param[in]   p_ble_evt   Bluetooth stack event.
  * @param[in]   p_context   Unused.
  */
-static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
-{
+static void ble_evt_handler(ble_evt_t const* p_ble_evt, void* p_context) {
     UNUSED_PARAMETER(p_context);
 
-    on_ble_evt((ble_evt_t *)p_ble_evt);
+    on_ble_evt((ble_evt_t*)p_ble_evt);
 }
 
 #else
@@ -545,15 +500,13 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
  *
  * @param[in] p_ble_evt  SoftDevice event.
  */
-static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
-{
+static void ble_evt_dispatch(ble_evt_t* p_ble_evt) {
     ble_conn_params_on_ble_evt(p_ble_evt);
     ble_epd_on_ble_evt(&m_epd, p_ble_evt);
     on_ble_evt(p_ble_evt);
     ble_advertising_on_ble_evt(p_ble_evt);
     ble_dfu_on_ble_evt(&m_dfus, p_ble_evt);
 }
-
 
 /**@brief Function for dispatching a system event to interested modules.
  *
@@ -562,8 +515,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
  *
  * @param[in] sys_evt  System stack event.
  */
-static void sys_evt_dispatch(uint32_t sys_evt)
-{
+static void sys_evt_dispatch(uint32_t sys_evt) {
     // Dispatch the system event to the fstorage module, where it will be
     // dispatched to the Flash Data Storage (FDS) module.
     fs_sys_event_handler(sys_evt);
@@ -579,8 +531,7 @@ static void sys_evt_dispatch(uint32_t sys_evt)
  *
  * @details This function initializes the SoftDevice and the BLE event interrupt.
  */
-static void ble_stack_init(void)
-{
+static void ble_stack_init(void) {
 #if defined(S112)
     APP_ERROR_CHECK(nrf_sdh_enable_request());
 
@@ -595,20 +546,19 @@ static void ble_stack_init(void)
     // Register a handler for BLE events.
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
 #else
-    nrf_clock_lf_cfg_t  clock_lf_cfg = NRF_CLOCK_LFCLKSRC;
+    nrf_clock_lf_cfg_t clock_lf_cfg = NRF_CLOCK_LFCLKSRC;
 
     // Initialize the SoftDevice handler module.
     SOFTDEVICE_HANDLER_INIT(&clock_lf_cfg, NULL);
 
     ble_enable_params_t ble_enable_params;
-    APP_ERROR_CHECK(softdevice_enable_get_default_config(CENTRAL_LINK_COUNT,
-                                                         PERIPHERAL_LINK_COUNT,
-                                                         &ble_enable_params));
+    APP_ERROR_CHECK(
+        softdevice_enable_get_default_config(CENTRAL_LINK_COUNT, PERIPHERAL_LINK_COUNT, &ble_enable_params));
     ble_enable_params.common_enable_params.vs_uuid_count = 2;
 
     // Check the ram settings against the used number of links
-    CHECK_RAM_START_ADDR(CENTRAL_LINK_COUNT,PERIPHERAL_LINK_COUNT);
-    
+    CHECK_RAM_START_ADDR(CENTRAL_LINK_COUNT, PERIPHERAL_LINK_COUNT);
+
     // Enable BLE stack.
     APP_ERROR_CHECK(softdevice_enable(&ble_enable_params));
 
@@ -622,29 +572,23 @@ static void ble_stack_init(void)
 
 #if defined(S112)
 /**@brief Function for handling events from the GATT library. */
-void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
-{
-    if ((m_conn_handle == p_evt->conn_handle) && (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED))
-    {
+void gatt_evt_handler(nrf_ble_gatt_t* p_gatt, nrf_ble_gatt_evt_t const* p_evt) {
+    if ((m_conn_handle == p_evt->conn_handle) && (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)) {
         m_epd.max_data_len = p_evt->params.att_mtu_effective - 3;
         NRF_LOG_INFO("Data len is set to 0x%X(%d)", m_epd.max_data_len, m_epd.max_data_len);
     }
-    NRF_LOG_DEBUG("ATT MTU exchange completed. central 0x%x peripheral 0x%x",
-                  p_gatt->att_mtu_desired_central,
+    NRF_LOG_DEBUG("ATT MTU exchange completed. central 0x%x peripheral 0x%x", p_gatt->att_mtu_desired_central,
                   p_gatt->att_mtu_desired_periph);
 }
 
-
 /**@brief Function for initializing the GATT library. */
-void gatt_init(void)
-{
+void gatt_init(void) {
     APP_ERROR_CHECK(nrf_ble_gatt_init(&m_gatt, gatt_evt_handler));
     APP_ERROR_CHECK(nrf_ble_gatt_att_mtu_periph_set(&m_gatt, NRF_SDH_BLE_GATT_MAX_MTU_SIZE));
 }
 #else
 // Set BW Config to HIGH.
-static void ble_options_set(void)
-{
+static void ble_options_set(void) {
     ble_opt_t ble_opt;
 
     memset(&ble_opt, 0, sizeof(ble_opt));
@@ -659,47 +603,46 @@ static void ble_options_set(void)
 
 /**@brief Function for initializing the Advertising functionality.
  */
-static void advertising_init(void)
-{
+static void advertising_init(void) {
 #if defined(S112)
     ble_advertising_init_t init;
 
     memset(&init, 0, sizeof(init));
 
-    init.advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+    init.advdata.name_type = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
-    init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+    init.advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
 
     init.srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
-    init.srdata.uuids_complete.p_uuids  = m_adv_uuids;
+    init.srdata.uuids_complete.p_uuids = m_adv_uuids;
 
-    init.config.ble_adv_fast_enabled  = true;
+    init.config.ble_adv_fast_enabled = true;
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
-    init.config.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS * 100;
+    init.config.ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS * 100;
     init.evt_handler = on_adv_evt;
 
     APP_ERROR_CHECK(ble_advertising_init(&m_advertising, &init));
 
     ble_advertising_conn_cfg_tag_set(&m_advertising, APP_BLE_CONN_CFG_TAG);
 #else
-    ble_advdata_t          advdata;
-    ble_advdata_t          scanrsp;
+    ble_advdata_t advdata;
+    ble_advdata_t scanrsp;
     ble_adv_modes_config_t options;
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
     memset(&advdata, 0, sizeof(advdata));
-    advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+    advdata.name_type = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance = false;
-    advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
-    
+    advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+
     memset(&scanrsp, 0, sizeof(scanrsp));
     scanrsp.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
-    scanrsp.uuids_complete.p_uuids  = m_adv_uuids;
+    scanrsp.uuids_complete.p_uuids = m_adv_uuids;
 
     memset(&options, 0, sizeof(options));
-    options.ble_adv_fast_enabled  = true;
+    options.ble_adv_fast_enabled = true;
     options.ble_adv_fast_interval = APP_ADV_INTERVAL;
-    options.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
+    options.ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS;
 
     APP_ERROR_CHECK(ble_advertising_init(&advdata, &scanrsp, &options, on_adv_evt, NULL));
 #endif
@@ -707,8 +650,7 @@ static void advertising_init(void)
 
 /**@brief Function for initializing the nrf log module.
  */
-static void log_init(void)
-{
+static void log_init(void) {
     APP_ERROR_CHECK(NRF_LOG_INIT(timestamp));
 #if defined(S112)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
@@ -717,8 +659,7 @@ static void log_init(void)
 
 /**@brief Function for initializing power management.
  */
-static void power_management_init(void)
-{
+static void power_management_init(void) {
 #if defined(S112)
     APP_ERROR_CHECK(nrf_pwr_mgmt_init());
 #else
@@ -730,28 +671,25 @@ static void power_management_init(void)
  *
  * @details If there is no pending log operation, then sleep until next the next event occurs.
  */
-static void idle_state_handle(void)
-{
+static void idle_state_handle(void) {
     app_feed_wdt();
 
-    if (NRF_LOG_PROCESS() == false)
-        nrf_pwr_mgmt_run();
+    if (NRF_LOG_PROCESS() == false) nrf_pwr_mgmt_run();
 }
 
 /**
  * @brief WDT events handler.
  */
-void wdt_event_handler(void)
-{
-    //NOTE: The max amount of time we can spend in WDT interrupt is two cycles of 32768[Hz] clock - after that, reset occurs
+void wdt_event_handler(void) {
+    // NOTE: The max amount of time we can spend in WDT interrupt is two cycles of 32768[Hz] clock - after that, reset
+    // occurs
     NRF_LOG_ERROR("WDT Rest!\r\n");
     NRF_LOG_FINAL_FLUSH();
 }
 
 /**@brief Function for application main entry.
  */
-int main(void)
-{
+int main(void) {
     log_init();
 
     // Save reset reason.
@@ -798,8 +736,7 @@ int main(void)
         ble_epd_on_timer(&m_epd, m_timestamp, true);
     }
 
-    for (;;)
-    {
+    for (;;) {
         app_sched_execute();
         idle_state_handle();
     }

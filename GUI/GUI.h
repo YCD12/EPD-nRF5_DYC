@@ -15,12 +15,12 @@ typedef struct {
     uint16_t width;
     uint16_t height;
     uint32_t timestamp;
-    uint8_t week_start; // 0: Sunday, 1: Monday
+    uint8_t week_start;  // 0: Sunday, 1: Monday
     int8_t temperature;
     float voltage;
     char ssid[20];
 } gui_data_t;
 
-void DrawGUI(gui_data_t *data, buffer_callback callback, void *callback_data);
+void DrawGUI(gui_data_t* data, buffer_callback callback, void* callback_data);
 
 #endif

@@ -19,6 +19,9 @@ class PaintManager {
     this.textBold = false;
     this.textItalic = false;
 
+    // Brush cursor indicator
+    this.brushCursor = null;
+
     // Undo/Redo functionality
     this.historyStack = [];
     this.historyStep = -1;
@@ -33,6 +36,8 @@ class PaintManager {
     this.onTouchMove = this.onTouchMove.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
     this.handleKeyboard = this.handleKeyboard.bind(this);
+    this.updateBrushCursor = this.updateBrushCursor.bind(this);
+    this.hideBrushCursor = this.hideBrushCursor.bind(this);
   }
 
   saveToHistory() {
@@ -132,8 +137,9 @@ class PaintManager {
       this.brushColor = e.target.value;
     });
 
-    document.getElementById('brush-size').addEventListener('change', (e) => {
+    document.getElementById('brush-size').addEventListener('input', (e) => {
       this.brushSize = parseInt(e.target.value);
+      this.updateBrushCursorSize();
     });
 
     document.getElementById('add-text-btn').addEventListener('click', () => this.startTextPlacement());
@@ -166,6 +172,14 @@ class PaintManager {
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', this.handleKeyboard);
+
+    // Mouse move for brush cursor
+    this.canvas.addEventListener('mousemove', this.updateBrushCursor);
+    this.canvas.addEventListener('mouseenter', this.updateBrushCursor);
+    this.canvas.addEventListener('mouseleave', this.hideBrushCursor);
+
+    // Create brush cursor element
+    this.createBrushCursor();
 
     // Initialize history with blank canvas state
     this.saveToHistory();
@@ -204,6 +218,104 @@ class PaintManager {
 
     // Cancel any pending text placement
     this.cancelTextPlacement();
+
+    // Update brush cursor visibility
+    this.updateBrushCursorVisibility();
+  }
+
+  createBrushCursor() {
+    // Create a div element to show as brush cursor
+    this.brushCursor = document.createElement('div');
+    this.brushCursor.id = 'brush-cursor';
+    this.brushCursor.style.position = 'fixed';
+    this.brushCursor.style.border = '2px solid rgba(0, 0, 0, 0.5)';
+    this.brushCursor.style.borderRadius = '50%';
+    this.brushCursor.style.pointerEvents = 'none';
+    this.brushCursor.style.display = 'none';
+    this.brushCursor.style.zIndex = '10000';
+    this.brushCursor.style.transform = 'translate(-50%, -50%)';
+    this.brushCursor.style.willChange = 'transform';
+    this.brushCursor.style.left = '0';
+    this.brushCursor.style.top = '0';
+    document.body.appendChild(this.brushCursor);
+    this.updateBrushCursorSize();
+
+    // For requestAnimationFrame throttling
+    this.cursorUpdateScheduled = false;
+    this.pendingCursorX = 0;
+    this.pendingCursorY = 0;
+  }
+
+  updateBrushCursorSize() {
+    if (!this.brushCursor) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = rect.width / this.canvas.width;
+    const scaleY = rect.height / this.canvas.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    const size = this.brushSize * scale;
+    this.brushCursor.style.width = size + 'px';
+    this.brushCursor.style.height = size + 'px';
+  }
+
+  updateBrushCursorVisibility() {
+    if (!this.brushCursor) return;
+
+    if (this.currentTool === 'brush' || this.currentTool === 'eraser') {
+      this.brushCursor.style.display = 'block';
+      this.canvas.style.cursor = 'none';
+    } else {
+      this.brushCursor.style.display = 'none';
+      this.canvas.style.cursor = 'default';
+    }
+  }
+
+  updateBrushCursor(e) {
+    if (!this.brushCursor) return;
+
+    if (this.currentTool === 'brush' || this.currentTool === 'eraser') {
+      this.brushCursor.style.display = 'block';
+      this.canvas.style.cursor = 'none';
+
+      // Store the pending position
+      this.pendingCursorX = e.clientX;
+      this.pendingCursorY = e.clientY;
+
+      // Schedule update using requestAnimationFrame for smooth movement
+      if (!this.cursorUpdateScheduled) {
+        this.cursorUpdateScheduled = true;
+        requestAnimationFrame(() => {
+          this.brushCursor.style.transform = `translate(${this.pendingCursorX}px, ${this.pendingCursorY}px) translate(-50%, -50%)`;
+          this.cursorUpdateScheduled = false;
+        });
+      }
+
+      // Update color to match brush or show white for eraser (only needs to happen once or when tool changes)
+      if (this.currentTool === 'eraser') {
+        if (this.brushCursor.getAttribute('data-tool') !== 'eraser') {
+          this.brushCursor.style.border = '2px solid rgba(255, 0, 0, 0.7)';
+          this.brushCursor.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          this.brushCursor.style.boxShadow = 'none';
+          this.brushCursor.setAttribute('data-tool', 'eraser');
+        }
+      } else {
+        if (this.brushCursor.getAttribute('data-tool') !== 'brush') {
+          // Use a contrasting border - white with black outline for visibility
+          this.brushCursor.style.border = '1px solid white';
+          this.brushCursor.style.boxShadow = '0 0 0 1px black, inset 0 0 0 1px black';
+          this.brushCursor.style.backgroundColor = 'transparent';
+          this.brushCursor.setAttribute('data-tool', 'brush');
+        }
+      }
+    }
+  }
+
+  hideBrushCursor() {
+    if (this.brushCursor) {
+      this.brushCursor.style.display = 'none';
+    }
+    this.canvas.style.cursor = 'default';
   }
 
   startPaint(e) {

@@ -493,10 +493,7 @@ function updateImage() {
     if (image.width / image.height == canvas.width / canvas.height) {
       if (cropManager.isCropMode()) cropManager.exitCropMode();
       ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);
-      paintManager.redrawTextElements();
-      paintManager.redrawLineSegments();
       convertDithering();
-      paintManager.saveToHistory(); // Save after loading image
     } else {
       alert(`图片宽高比例与画布不匹配，将进入裁剪模式。\n请放大图片后移动图片使其充满画布, 再点击"完成"按钮。`);
       paintManager.setActiveTool(null, '');
@@ -549,6 +546,9 @@ function clearCanvas() {
 }
 
 function convertDithering() {
+  paintManager.redrawTextElements();
+  paintManager.redrawLineSegments();
+
   const contrast = parseFloat(document.getElementById('ditherContrast').value);
   const currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const imageData = new ImageData(
@@ -565,22 +565,23 @@ function convertDithering() {
   const processedData = processImageData(ditherImage(imageData, alg, strength, mode), mode);
   const finalImageData = decodeProcessedData(processedData, canvas.width, canvas.height, mode);
   ctx.putImageData(finalImageData, 0, 0);
+
+  paintManager.saveToHistory(); // Save dithered image to history
+}
+
+function applyDither() {
+  cropManager.finishCrop(() => convertDithering());
 }
 
 function initEventHandlers() {
-  document.getElementById("epddriver").addEventListener("change", updateDitcherOptions);
-  document.getElementById("imageFile").addEventListener("change", updateImage);
-  document.getElementById("ditherMode").addEventListener("change", () => cropManager.finishCrop());
-  document.getElementById("ditherAlg").addEventListener("change", () => cropManager.finishCrop());
-  document.getElementById("ditherStrength").addEventListener("input", function () {
-    cropManager.finishCrop();
-    document.getElementById("ditherStrengthValue").innerText = parseFloat(this.value).toFixed(1);
+  document.getElementById("ditherStrength").addEventListener("input", (e) => {
+    document.getElementById("ditherStrengthValue").innerText = parseFloat(e.target.value).toFixed(1);
+    applyDither();
   });
-  document.getElementById("ditherContrast").addEventListener("input", function () {
-    cropManager.finishCrop();
-    document.getElementById("ditherContrastValue").innerText = parseFloat(this.value).toFixed(1);
+  document.getElementById("ditherContrast").addEventListener("input", (e) => {
+    document.getElementById("ditherContrastValue").innerText = parseFloat(e.target.value).toFixed(1);
+    applyDither();
   });
-  document.getElementById("canvasSize").addEventListener("change", updateCanvasSize);
 }
 
 function checkDebugMode() {

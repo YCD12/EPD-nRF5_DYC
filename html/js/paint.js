@@ -174,9 +174,8 @@ class PaintManager {
     document.addEventListener('keydown', this.handleKeyboard);
 
     // Mouse move for brush cursor
-    this.canvas.addEventListener('mousemove', this.updateBrushCursor);
     this.canvas.addEventListener('mouseenter', this.updateBrushCursor);
-    this.canvas.addEventListener('mouseleave', this.hideBrushCursor);
+    this.canvas.addEventListener('mousemove', this.updateBrushCursor);
 
     // Create brush cursor element
     this.createBrushCursor();
@@ -218,9 +217,6 @@ class PaintManager {
 
     // Cancel any pending text placement
     this.cancelTextPlacement();
-
-    // Update brush cursor visibility
-    this.updateBrushCursorVisibility();
   }
 
   createBrushCursor() {
@@ -259,54 +255,54 @@ class PaintManager {
     this.brushCursor.style.height = size + 'px';
   }
 
-  updateBrushCursorVisibility() {
-    if (!this.brushCursor) return;
-
-    if (this.currentTool === 'brush' || this.currentTool === 'eraser') {
-      this.brushCursor.style.display = 'block';
-      this.canvas.style.cursor = 'none';
-    } else {
-      this.brushCursor.style.display = 'none';
-      this.canvas.style.cursor = 'default';
-    }
-  }
-
   updateBrushCursor(e) {
     if (!this.brushCursor) return;
 
     if (this.currentTool === 'brush' || this.currentTool === 'eraser') {
-      this.brushCursor.style.display = 'block';
-      this.canvas.style.cursor = 'none';
+      // Check if mouse is within canvas bounds
+      const rect = this.canvas.getBoundingClientRect();
+      const isInCanvas = e.clientX >= rect.left && 
+                         e.clientX <= rect.right && 
+                         e.clientY >= rect.top && 
+                         e.clientY <= rect.bottom;
 
-      // Store the pending position
-      this.pendingCursorX = e.clientX;
-      this.pendingCursorY = e.clientY;
+      if (isInCanvas) {
+        this.brushCursor.style.display = 'block';
+        this.canvas.style.cursor = 'none';
 
-      // Schedule update using requestAnimationFrame for smooth movement
-      if (!this.cursorUpdateScheduled) {
-        this.cursorUpdateScheduled = true;
-        requestAnimationFrame(() => {
-          this.brushCursor.style.transform = `translate(${this.pendingCursorX}px, ${this.pendingCursorY}px) translate(-50%, -50%)`;
-          this.cursorUpdateScheduled = false;
-        });
-      }
+        // Store the pending position
+        this.pendingCursorX = e.clientX;
+        this.pendingCursorY = e.clientY;
 
-      // Update color to match brush or show white for eraser (only needs to happen once or when tool changes)
-      if (this.currentTool === 'eraser') {
-        if (this.brushCursor.getAttribute('data-tool') !== 'eraser') {
-          this.brushCursor.style.border = '2px solid rgba(255, 0, 0, 0.7)';
-          this.brushCursor.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-          this.brushCursor.style.boxShadow = 'none';
-          this.brushCursor.setAttribute('data-tool', 'eraser');
+        // Schedule update using requestAnimationFrame for smooth movement
+        if (!this.cursorUpdateScheduled) {
+          this.cursorUpdateScheduled = true;
+          requestAnimationFrame(() => {
+            this.brushCursor.style.transform = `translate(${this.pendingCursorX}px, ${this.pendingCursorY}px) translate(-50%, -50%)`;
+            this.cursorUpdateScheduled = false;
+          });
+        }
+
+        // Update color to match brush or show white for eraser (only needs to happen once or when tool changes)
+        if (this.currentTool === 'eraser') {
+          if (this.brushCursor.getAttribute('data-tool') !== 'eraser') {
+            this.brushCursor.style.border = '2px solid rgba(255, 0, 0, 0.7)';
+            this.brushCursor.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            this.brushCursor.style.boxShadow = 'none';
+            this.brushCursor.setAttribute('data-tool', 'eraser');
+          }
+        } else {
+          if (this.brushCursor.getAttribute('data-tool') !== 'brush') {
+            // Use a contrasting border - white with black outline for visibility
+            this.brushCursor.style.border = '1px solid white';
+            this.brushCursor.style.boxShadow = '0 0 0 1px black, inset 0 0 0 1px black';
+            this.brushCursor.style.backgroundColor = 'transparent';
+            this.brushCursor.setAttribute('data-tool', 'brush');
+          }
         }
       } else {
-        if (this.brushCursor.getAttribute('data-tool') !== 'brush') {
-          // Use a contrasting border - white with black outline for visibility
-          this.brushCursor.style.border = '1px solid white';
-          this.brushCursor.style.boxShadow = '0 0 0 1px black, inset 0 0 0 1px black';
-          this.brushCursor.style.backgroundColor = 'transparent';
-          this.brushCursor.setAttribute('data-tool', 'brush');
-        }
+        // Hide cursor when outside canvas
+        this.brushCursor.style.display = 'none';
       }
     }
   }
@@ -353,6 +349,8 @@ class PaintManager {
     this.isDraggingText = false;
     this.lastX = 0;
     this.lastY = 0;
+
+    this.hideBrushCursor();
   }
 
   paint(e) {

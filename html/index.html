@@ -22,7 +22,7 @@
 				</div>
 				<div class="flex-group right debug">
 					<label for="epddriver">驱动</label>
-					<select id="epddriver">
+					<select id="epddriver" onchange="updateDitcherOptions()">
 						<option value="01" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, UC8176)</option>
 						<option value="03" data-color="threeColor" data-size="4.2_400_300">4.2寸 (三色, UC8176)</option>
 						<option value="04" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, SSD1619)</option>
@@ -62,12 +62,12 @@
 		<fieldset>
 			<legend>蓝牙传图</legend>
 			<div class="flex-container">
-				<input type="file" id="imageFile" accept=".png,.jpg,.bmp,.webp,.jpeg">
+				<input type="file" id="imageFile" accept=".png,.jpg,.bmp,.webp,.jpeg" onchange="updateImage()">
 			</div>
 			<div class="flex-container options">
 				<div class="flex-group debug">
 					<label for="canvasSize">画布尺寸:</label>
-					<select id="canvasSize">
+					<select id="canvasSize" onchange="updateCanvasSize()">
 						<option value="1.54_152_152">1.54 (152x152)</option>
 						<option value="1.54_200_200">1.54 (200x200)</option>
 						<option value="2.13_212_104">2.13 (212x104)</option>
@@ -94,7 +94,7 @@
 				</div>
 				<div class="flex-group debug">
 					<label for="ditherMode">颜色模式:</label>
-					<select id="ditherMode">
+					<select id="ditherMode" onchange="applyDither()">
 						<option value="blackWhiteColor">双色(黑白)</option>
 						<option value="threeColor">三色(黑白红)</option>
 						<option value="fourColor">四色(黑白红黄)</option>
@@ -103,7 +103,7 @@
 				</div>
 				<div class="flex-group">
 					<label for="ditherAlg">抖动算法:</label>
-					<select id="ditherAlg">
+					<select id="ditherAlg" onchange="applyDither()">
 						<option value="floydSteinberg">Floyd-Steinberg</option>
 						<option value="atkinson">Atkinson</option>
 						<option value="bayer">Bayer</option>
@@ -217,7 +217,7 @@
 						<button id="crop-move-up" title="上移">⇧</button>
 						<button id="crop-move-down" title="下移">⇩</button>
 						<button id="crop-move-right" title="右移">⇨</button>
-						<button class="primary" onclick="cropManager.finishCrop()">完成</button>
+						<button class="primary" onclick="applyDither()">完成</button>
 					</div>
 				</div>
 			</div>

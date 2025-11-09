@@ -1,8 +1,7 @@
 class CropManager {
-  constructor(canvas, ctx, paintManager) {
+  constructor(canvas, ctx) {
     this.canvas = canvas;
     this.ctx = ctx;
-    this.paintManager = paintManager;
     this.backgroundZoom = 1;
     this.backgroundPanX = 0;
     this.backgroundPanY = 0;
@@ -84,7 +83,7 @@ class CropManager {
     this.canvas.parentNode.classList.add('crop-mode');
   }
 
-  finishCrop() {
+  finishCrop(callback) {
     const imageFile = document.getElementById('imageFile');
     if (imageFile.files.length == 0) return;
 
@@ -103,12 +102,8 @@ class CropManager {
       fillCanvas('white');
       this.ctx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, this.canvas.width, this.canvas.height);
 
-      this.paintManager.redrawTextElements();
-      this.paintManager.redrawLineSegments();
-      convertDithering();
-
       this.exitCropMode();
-      this.paintManager.saveToHistory(); // Save after finishing crop
+      if (callback) callback();
     };
     image.src = URL.createObjectURL(imageFile.files[0]);
   }

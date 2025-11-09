@@ -2,24 +2,25 @@ let bleDevice, gattServer;
 let epdService, epdCharacteristic;
 let startTime, msgIndex, appVersion;
 let canvas, ctx, textDecoder;
+let paintManager, cropManager;
 
 const EpdCmd = {
-  SET_PINS:  0x00,
-  INIT:      0x01,
-  CLEAR:     0x02,
-  SEND_CMD:  0x03,
+  SET_PINS: 0x00,
+  INIT: 0x01,
+  CLEAR: 0x02,
+  SEND_CMD: 0x03,
   SEND_DATA: 0x04,
-  REFRESH:   0x05,
-  SLEEP:     0x06,
+  REFRESH: 0x05,
+  SLEEP: 0x06,
 
-  SET_TIME:  0x20,
+  SET_TIME: 0x20,
 
   WRITE_IMG: 0x30, // v1.6
 
   SET_CONFIG: 0x90,
-  SYS_RESET:  0x91,
-  SYS_SLEEP:  0x92,
-  CFG_ERASE:  0x99,
+  SYS_RESET: 0x91,
+  SYS_SLEEP: 0x92,
+  CFG_ERASE: 0x99,
 };
 
 const canvasSizes = [
@@ -190,7 +191,7 @@ function convertUC8159(blackWhiteData, redWhiteData) {
 }
 
 async function sendimg() {
-  if (isCropMode()) {
+  if (cropManager.isCropMode()) {
     alert("请先完成图片裁剪！发送已取消。");
     return;
   }
@@ -249,7 +250,7 @@ async function sendimg() {
 }
 
 function downloadDataArray() {
-  if (isCropMode()) {
+  if (cropManager.isCropMode()) {
     alert("请先完成图片裁剪！下载已取消。");
     return;
   }
@@ -441,6 +442,7 @@ function addLog(logTXT, action = '') {
 
   const logEntry = document.createElement('div');
   const timeSpan = document.createElement('span');
+  logEntry.className = 'log-line';
   timeSpan.className = 'time';
   timeSpan.textContent = time;
   logEntry.appendChild(timeSpan);
@@ -470,6 +472,14 @@ function fillCanvas(style) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+function setCanvasTitle(title) {
+  const canvasTitle = document.querySelector('.canvas-title');
+  if (canvasTitle) {
+    canvasTitle.innerText = title;
+    canvasTitle.style.display = title && title !== '' ? 'block' : 'none';
+  }
+}
+
 function updateImage() {
   const imageFile = document.getElementById('imageFile');
   if (imageFile.files.length == 0) {
@@ -481,16 +491,16 @@ function updateImage() {
   image.onload = function () {
     URL.revokeObjectURL(this.src);
     if (image.width / image.height == canvas.width / canvas.height) {
-      if (isCropMode()) exitCropMode();
+      if (cropManager.isCropMode()) cropManager.exitCropMode();
       ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);
-      redrawTextElements();
-      redrawLineSegments();
+      paintManager.redrawTextElements();
+      paintManager.redrawLineSegments();
       convertDithering();
-      saveToHistory(); // Save after loading image
+      paintManager.saveToHistory(); // Save after loading image
     } else {
-      alert("图片宽高比例与画布不匹配，将进入裁剪模式。\n请放大图片后移动图片使其充满画布，再点击“完成”按钮。");
-      setActiveTool(null, '');
-      initializeCrop();
+      alert(`图片宽高比例与画布不匹配，将进入裁剪模式。\n请放大图片后移动图片使其充满画布, 再点击"完成"按钮。`);
+      paintManager.setActiveTool(null, '');
+      cropManager.initializeCrop();
     }
   };
   image.src = URL.createObjectURL(imageFile.files[0]);
@@ -530,10 +540,9 @@ function rotateCanvas() {
 function clearCanvas() {
   if (confirm('清除画布内容?')) {
     fillCanvas('white');
-    textElements = []; // Clear stored text positions
-    lineSegments = []; // Clear stored line segments
-    if (isCropMode()) exitCropMode();
-    saveToHistory(); // Save cleared canvas to history
+    paintManager.clearElements(); // Clear stored text positions and line segments
+    if (cropManager.isCropMode()) cropManager.exitCropMode();
+    paintManager.saveToHistory(); // Save cleared canvas to history
     return true;
   }
   return false;
@@ -561,14 +570,14 @@ function convertDithering() {
 function initEventHandlers() {
   document.getElementById("epddriver").addEventListener("change", updateDitcherOptions);
   document.getElementById("imageFile").addEventListener("change", updateImage);
-  document.getElementById("ditherMode").addEventListener("change", finishCrop);
-  document.getElementById("ditherAlg").addEventListener("change", finishCrop);
+  document.getElementById("ditherMode").addEventListener("change", () => cropManager.finishCrop());
+  document.getElementById("ditherAlg").addEventListener("change", () => cropManager.finishCrop());
   document.getElementById("ditherStrength").addEventListener("input", function () {
-    finishCrop();
+    cropManager.finishCrop();
     document.getElementById("ditherStrengthValue").innerText = parseFloat(this.value).toFixed(1);
   });
   document.getElementById("ditherContrast").addEventListener("input", function () {
-    finishCrop();
+    cropManager.finishCrop();
     document.getElementById("ditherContrastValue").innerText = parseFloat(this.value).toFixed(1);
   });
   document.getElementById("canvasSize").addEventListener("change", updateCanvasSize);
@@ -580,12 +589,12 @@ function checkDebugMode() {
   const debugMode = urlParams.get('debug');
 
   if (debugMode === 'true') {
-    document.body.classList.add('debug-mode');
+    document.body.classList.add('dark-mode');
     link.innerHTML = '正常模式';
     link.setAttribute('href', window.location.pathname);
     addLog("注意：开发模式功能已开启！不懂请不要随意修改，否则后果自负！");
   } else {
-    document.body.classList.remove('debug-mode');
+    document.body.classList.remove('dark-mode');
     link.innerHTML = '开发模式';
     link.setAttribute('href', window.location.pathname + '?debug=true');
   }
@@ -599,8 +608,11 @@ document.body.onload = () => {
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  initPaintTools();
-  initCropTools();
+  paintManager = new PaintManager(canvas, ctx);
+  cropManager = new CropManager(canvas, ctx, paintManager);
+
+  paintManager.initPaintTools();
+  cropManager.initCropTools();
   initEventHandlers();
   updateButtonStatus();
   checkDebugMode();

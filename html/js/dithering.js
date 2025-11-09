@@ -508,7 +508,7 @@ function bayerDither(imageData, strength, mode) {
 
       // Find closest color in palette
       const closest = findClosestColor(clampedR, clampedG, clampedB, mode);
-      
+
       data[idx] = closest.r;
       data[idx + 1] = closest.g;
       data[idx + 2] = closest.b;

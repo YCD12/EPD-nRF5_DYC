@@ -530,6 +530,7 @@ function ditherImage(imageData, alg, strength, mode) {
       return jarvisDither(imageData, strength, mode);
     case 'bayer':
       return bayerDither(imageData, strength, mode);
+    case 'none':
     default:
       return imageData;
   }

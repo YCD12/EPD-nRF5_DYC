@@ -42,7 +42,7 @@ void ble_epd_evt_handler(ble_evt_t const* p_ble_evt, void* p_context);
 #define BLE_EPD_DEF(_name) static ble_epd_t _name;
 #endif
 
-#define APP_VERSION 0x19
+#define APP_VERSION 0x20
 
 #define BLE_UUID_EPD_SVC_BASE \
     {{0XEC, 0X5A, 0X67, 0X1C, 0XC1, 0XB6, 0X46, 0XFB, 0X8D, 0X91, 0X28, 0XD8, 0X22, 0X36, 0X75, 0X62}}
@@ -74,11 +74,32 @@ enum EPD_CMDS {
 
     EPD_CMD_WRITE_IMAGE = 0x30, /** < write image data to EPD ram */
 
+    EPD_CMD_WRITE_BLOCK    = 0x31,   /**< write block with CRC verification */
+    EPD_CMD_QUERY_STATUS   = 0x32,   /**< query transfer status */
+    EPD_CMD_RESET_TRANSFER = 0x33,   /**< reset transfer state */
+
     EPD_CMD_SET_CONFIG = 0x90, /**< set full EPD config */
     EPD_CMD_SYS_RESET = 0x91,  /**< MCU reset */
     EPD_CMD_SYS_SLEEP = 0x92,  /**< MCU enter sleep mode */
     EPD_CMD_CFG_ERASE = 0x99,  /**< Erase config and reset */
 };
+
+// Response types for CRC transfer
+#define EPD_RSP_BLOCK_ACK       0xA0  // Block ACK/NACK response
+#define EPD_RSP_STATUS          0xA1  // Status response
+
+// Transfer configuration
+#define EPD_MAX_BLOCKS          512   // Maximum blocks (96KB / 192B)
+#define EPD_BLOCK_BITMAP_SIZE   64    // Bitmap size (512 bits)
+
+/**@brief Image transfer context for resume capability */
+typedef struct {
+    uint8_t  session_id;                          /**< Session ID for transfer identification */
+    uint16_t total_blocks;                        /**< Total number of blocks */
+    uint16_t received_blocks;                     /**< Number of received blocks */
+    uint8_t  block_bitmap[EPD_BLOCK_BITMAP_SIZE]; /**< Bitmap of received blocks */
+    bool     transfer_active;                     /**< Whether transfer is active */
+} image_transfer_ctx_t;
 
 /**@brief EPD Service structure.
  *
@@ -97,6 +118,7 @@ typedef struct {
                                      characteristic.*/
     epd_model_t* epd;             /**< current EPD model */
     epd_config_t config;          /**< EPD config */
+    image_transfer_ctx_t transfer_ctx; /**< Image transfer context for CRC and resume */
 } ble_epd_t;
 
 typedef struct {

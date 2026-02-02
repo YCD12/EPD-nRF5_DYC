@@ -23,17 +23,22 @@
 				<div class="flex-group right debug">
 					<label for="epddriver">驱动</label>
 					<select id="epddriver" onchange="updateDitcherOptions()">
-						<option value="01" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, UC8176)</option>
+						<option value="01" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, UC8176)
+						</option>
 						<option value="03" data-color="threeColor" data-size="4.2_400_300">4.2寸 (三色, UC8176)</option>
-						<option value="04" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, SSD1619)</option>
+						<option value="04" data-color="blackWhiteColor" data-size="4.2_400_300">4.2寸 (黑白, SSD1619)
+						</option>
 						<option value="02" data-color="threeColor" data-size="4.2_400_300">4.2寸 (三色, SSD1619)</option>
 						<option value="05" data-color="fourColor" data-size="4.2_400_300">4.2寸 (四色, JD79668)</option>
-						<option value="06" data-color="blackWhiteColor" data-size="7.5_800_480">7.5寸 (黑白, UC8179)</option>
+						<option value="06" data-color="blackWhiteColor" data-size="7.5_800_480">7.5寸 (黑白, UC8179)
+						</option>
 						<option value="07" data-color="threeColor" data-size="7.5_800_480">7.5寸 (三色, UC8179)</option>
 						<option value="0c" data-color="fourColor" data-size="7.5_800_480">7.5寸 (四色, JD79668)</option>
-						<option value="08" data-color="blackWhiteColor" data-size="7.5_640_384">7.5寸低分 (黑白, UC8159)</option>
+						<option value="08" data-color="blackWhiteColor" data-size="7.5_640_384">7.5寸低分 (黑白, UC8159)
+						</option>
 						<option value="09" data-color="threeColor" data-size="7.5_640_384">7.5寸低分 (三色, UC8159)</option>
-						<option value="0a" data-color="blackWhiteColor" data-size="7.5_880_528">7.5寸HD (黑白, SSD1677)</option>
+						<option value="0a" data-color="blackWhiteColor" data-size="7.5_880_528">7.5寸HD (黑白, SSD1677)
+						</option>
 						<option value="0b" data-color="threeColor" data-size="7.5_880_528">7.5寸HD (三色, SSD1677)</option>
 					</select>
 				</div>
@@ -52,12 +57,19 @@
 					<label for="weekStart">星期第一天:</label>
 					<select id="weekStart">
 						<option value="1" selected>周一</option>
+						<option value="2">周二</option>
+						<option value="3">周三</option>
+						<option value="4">周四</option>
+						<option value="5">周五</option>
+						<option value="6">周六</option>
 						<option value="0">周日</option>
 					</select>
 				</div>
 				<div class="flex-group">
 					<button id="calendarmodebutton" type="button" class="primary" onclick="syncTime(1)">日历模式</button>
 					<button id="clockmodebutton" type="button" class="primary" onclick="syncTime(2)">时钟模式</button>
+					<button id="legacyclockbutton" type="button" class="primary" onclick="syncTimeLegacy()"
+						style="display:none;">老款时钟</button>
 					<button id="clearscreenbutton" type="button" class="secondary" onclick="clearScreen()">清除屏幕</button>
 				</div>
 				<div class="flex-group right debug">
@@ -336,7 +348,8 @@
 	<script type="text/javascript" src="js/dithering.js?v=20251109"></script>
 	<script type="text/javascript" src="js/paint.js?v=20251109"></script>
 	<script type="text/javascript" src="js/crop.js?v=20251109"></script>
-	<script type="text/javascript" src="js/main.js?v=20251109"></script>
+	<script type="text/javascript" src="js/ble_transfer.js?v=20260202"></script>
+	<script type="text/javascript" src="js/main.js?v=20260202"></script>
 </body>
 
 </html>

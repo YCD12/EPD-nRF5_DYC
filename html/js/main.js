@@ -4,6 +4,10 @@ let startTime, msgIndex, appVersion;
 let canvas, ctx, textDecoder;
 let paintManager, cropManager;
 
+// APP版本号 (便于调试)
+const APP_VERSION = '2.0.3';
+const APP_BUILD_DATE = '2026-02-03';
+
 const EpdCmd = {
   SET_PINS: 0x00,
   INIT: 0x01,
@@ -17,6 +21,11 @@ const EpdCmd = {
   SET_WEEK_START: 0x21,
 
   WRITE_IMG: 0x30, // v1.6
+
+  // CRC Transfer commands (v1.9+)
+  WRITE_BLOCK: 0x31,
+  QUERY_STATUS: 0x32,
+  RESET_TRANSFER: 0x33,
 
   SET_CONFIG: 0x90,
   SYS_RESET: 0x91,
@@ -72,7 +81,7 @@ function resetVariables() {
   epdService = null;
   epdCharacteristic = null;
   msgIndex = 0;
-  document.getElementById("log").value = '';
+  document.getElementById("log").innerHTML = '';
 }
 
 async function write(cmd, data, withResponse = true) {
@@ -125,6 +134,28 @@ async function writeImage(data, step = 'bw') {
   }
 }
 
+// New CRC-verified image transfer with resume capability
+async function writeImageCRC(data, step = 'bw') {
+  const stepName = step === 'bw' ? '黑白' : '颜色';
+
+  try {
+    await BleTransfer.sendImageWithResume(data, step, (sent, total, speedInfo) => {
+      if (speedInfo) {
+        setStatus(`${stepName}块(CRC): ${sent}/${total}, ${BleTransfer.getSpeedString()}, ${speedInfo.elapsed}s`);
+      } else {
+        setStatus(`${stepName}块(CRC): ${sent}/${total}`);
+      }
+    });
+    return true;
+  } catch (e) {
+    console.error('CRC transfer failed:', e);
+    addLog(`CRC传输失败: ${e.message}，回退到普通传输`);
+    // Fallback to legacy transfer
+    await writeImage(data, step);
+    return true;
+  }
+}
+
 async function setDriver() {
   if (!confirm('确认设置驱动配置？此操作将重新初始化屏幕。')) return;
   await write(EpdCmd.SET_PINS, document.getElementById("epdpins").value);
@@ -132,23 +163,16 @@ async function setDriver() {
   addLog("驱动配置已设置");
 }
 
-async function syncTime(mode) {
-  const modeName = mode === 1 ? '日历模式' : '时钟模式';
-  let confirmMsg = `确认切换到${modeName}？`;
-  if (mode === 2) {
-    confirmMsg += '\n\n提醒：时钟模式目前使用全刷实现，此功能目前多用于修复老化屏残影问题，不建议长期开启。';
-  }
-  if (!confirm(confirmMsg)) return;
-  
-  // 获取星期第一天设置（默认周一）
+// 辅助函数：获取星期第一天设置
+function getWeekStart() {
   const weekStartValue = document.getElementById('weekStart').value;
-  const weekStart = weekStartValue !== null && weekStartValue !== '' ? parseInt(weekStartValue) : 1;
-  
-  // 先设置星期第一天
-  await write(EpdCmd.SET_WEEK_START, new Uint8Array([weekStart]));
-  
+  return weekStartValue !== null && weekStartValue !== '' ? parseInt(weekStartValue) : 1;
+}
+
+// 辅助函数：构建时间数据包
+function buildTimeData(mode) {
   const timestamp = new Date().getTime() / 1000;
-  const data = new Uint8Array([
+  return new Uint8Array([
     (timestamp >> 24) & 0xFF,
     (timestamp >> 16) & 0xFF,
     (timestamp >> 8) & 0xFF,
@@ -156,11 +180,42 @@ async function syncTime(mode) {
     -(new Date().getTimezoneOffset() / 60),
     mode
   ]);
-  if (await write(EpdCmd.SET_TIME, data)) {
-    addLog("时间已同步！");
-    addLog(`星期第一天已设置为：${weekStart === 1 ? '周一' : '周日'}`);
+}
+
+// 辅助函数：发送时间同步命令
+async function sendTimeCommand(mode, modeName) {
+  const weekStart = getWeekStart();
+  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  // 先设置星期第一天
+  await write(EpdCmd.SET_WEEK_START, new Uint8Array([weekStart]));
+
+  // 发送时间数据
+  if (await write(EpdCmd.SET_TIME, buildTimeData(mode))) {
+    addLog(`${modeName}已启用！`);
+    addLog(`星期第一天已设置为：${weekDays[weekStart]}`);
     addLog("屏幕刷新完成前请不要操作。");
+    return true;
   }
+  return false;
+}
+
+async function syncTime(mode) {
+  const modeName = mode === 1 ? '日历模式' : '时钟模式';
+  let confirmMsg = `确认切换到${modeName}？`;
+  if (mode === 2) {
+    confirmMsg += '\n\n⚠️ 警告：时钟模式会加速屏幕老化导致损坏！\n• 请勿长时间使用\n• 费电';
+  }
+  if (!confirm(confirmMsg)) return;
+
+  await sendTimeCommand(mode, modeName);
+}
+
+// 老款时钟模式 (仅适用于UC8179 7.5寸)
+async function syncTimeLegacy() {
+  if (!confirm('确认切换到老款时钟模式？\n\n⚠️ 警告：时钟模式会加速屏幕老化导致损坏！\n• 请勿长时间使用\n• 此模式仅适用于UC8179 7.5寸屏幕\n• 费电')) return;
+
+  await sendTimeCommand(3, '老款时钟模式');
 }
 
 async function clearScreen() {
@@ -234,24 +289,32 @@ async function sendimg() {
 
   updateButtonStatus(true);
 
+  // Use CRC transfer for firmware version >= 0x20
+  const useCRC = (appVersion >= 0x20) && (typeof BleTransfer !== 'undefined');
+  const transferFn = useCRC ? writeImageCRC : writeImage;
+
+  if (useCRC) {
+    addLog("使用CRC校验传输模式");
+  }
+
   if (ditherMode === 'fourColor') {
-    await writeImage(processedData, 'color');
+    await transferFn(processedData, 'color');
   } else if (ditherMode === 'threeColor') {
     const halfLength = Math.floor(processedData.length / 2);
     const blackWhiteData = processedData.slice(0, halfLength);
     const redWhiteData = processedData.slice(halfLength);
     if (epdDriverSelect.value === '08' || epdDriverSelect.value === '09') {
-      await writeImage(convertUC8159(blackWhiteData, redWhiteData), 'bw');
+      await transferFn(convertUC8159(blackWhiteData, redWhiteData), 'bw');
     } else {
-      await writeImage(blackWhiteData, 'bw');
-      await writeImage(redWhiteData, 'red');
+      await transferFn(blackWhiteData, 'bw');
+      await transferFn(redWhiteData, 'red');
     }
   } else if (ditherMode === 'blackWhiteColor') {
     if (epdDriverSelect.value === '08' || epdDriverSelect.value === '09') {
       const emptyData = new Uint8Array(processedData.length).fill(0xFF);
-      await writeImage(convertUC8159(processedData, emptyData), 'bw');
+      await transferFn(convertUC8159(processedData, emptyData), 'bw');
     } else {
-      await writeImage(processedData, 'bw');
+      await transferFn(processedData, 'bw');
     }
   } else {
     addLog("当前固件不支持此颜色模式。");
@@ -333,6 +396,10 @@ function disconnect() {
   resetVariables();
   addLog('已断开连接.');
   document.getElementById("connectbutton").innerHTML = '连接';
+
+  // 隐藏老款时钟按钮
+  const legacyBtn = document.getElementById('legacyclockbutton');
+  if (legacyBtn) legacyBtn.style.display = 'none';
 }
 
 async function preConnect() {
@@ -373,6 +440,15 @@ async function reConnect() {
 
 function handleNotify(value, idx) {
   const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+
+  // Route CRC transfer responses to BleTransfer module
+  if (data.length >= 1 && (data[0] === 0xA0 || data[0] === 0xA1)) {
+    if (typeof BleTransfer !== 'undefined') {
+      BleTransfer.handleNotification(value);
+    }
+    return;
+  }
+
   if (idx == 0) {
     addLog(`收到配置：${bytes2hex(data)}`);
     const epdpins = document.getElementById("epdpins");
@@ -381,6 +457,44 @@ function handleNotify(value, idx) {
     if (data.length > 10) epdpins.value += bytes2hex(data.slice(10, 11));
     epddriver.value = bytes2hex(data.slice(7, 8));
     updateDitcherOptions();
+
+    // 解析并显示设备型号和尺寸
+    const driverCode = bytes2hex(data.slice(7, 8));
+    const selectedOption = epddriver.querySelector(`option[value="${driverCode}"]`);
+    if (selectedOption) {
+      const screenInfo = selectedOption.textContent.trim();
+      const sizeData = selectedOption.getAttribute('data-size');
+      const colorMode = selectedOption.getAttribute('data-color');
+
+      // 解析尺寸信息 (格式: "7.5_800_480")
+      let sizeInfo = '';
+      if (sizeData) {
+        const [size, width, height] = sizeData.split('_');
+        sizeInfo = `${size}英寸 ${width}x${height}`;
+      }
+
+      // 解析颜色模式
+      const colorModeText = {
+        'blackWhiteColor': '黑白',
+        'threeColor': '三色(黑白红)',
+        'fourColor': '四色'
+      }[colorMode] || colorMode;
+
+      addLog(`📱 屏幕型号: ${screenInfo}`);
+      addLog(`📐 屏幕尺寸: ${sizeInfo}`);
+      addLog(`🎨 颜色模式: ${colorModeText}`);
+
+      // 检测是否为UC8179 7.5寸屏幕 (驱动码06或07)，显示老款时钟按钮
+      const legacyClockBtn = document.getElementById('legacyclockbutton');
+      if (legacyClockBtn) {
+        if (driverCode === '06' || driverCode === '07') {
+          legacyClockBtn.style.display = 'inline-block';
+          addLog('🕐 检测到UC8179，已启用老款时钟模式按钮');
+        } else {
+          legacyClockBtn.style.display = 'none';
+        }
+      }
+    }
   } else {
     if (textDecoder == null) textDecoder = new TextDecoder();
     const msg = textDecoder.decode(data);
@@ -400,19 +514,50 @@ function handleNotify(value, idx) {
 async function connect() {
   if (bleDevice == null || epdCharacteristic != null) return;
 
-  try {
-    addLog("正在连接: " + bleDevice.name);
-    gattServer = await bleDevice.gatt.connect();
-    addLog('  找到 GATT Server');
-    epdService = await gattServer.getPrimaryService('62750001-d828-918d-fb46-b6c11c675aec');
-    addLog('  找到 EPD Service');
-    epdCharacteristic = await epdService.getCharacteristic('62750002-d828-918d-fb46-b6c11c675aec');
-    addLog('  找到 Characteristic');
-  } catch (e) {
-    console.error(e);
-    if (e.message) addLog("connect: " + e.message);
-    disconnect();
-    return;
+  const MAX_CONNECT_RETRIES = 3;
+  const RETRY_DELAY_MS = 500;
+
+  for (let retry = 0; retry < MAX_CONNECT_RETRIES; retry++) {
+    try {
+      if (retry > 0) {
+        addLog(`重试连接 (${retry}/${MAX_CONNECT_RETRIES - 1})...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+
+      addLog("正在连接: " + bleDevice.name);
+      gattServer = await bleDevice.gatt.connect();
+      addLog('  找到 GATT Server');
+
+      // 等待连接稳定
+      await new Promise(r => setTimeout(r, 100));
+
+      // 检查连接是否仍然有效
+      if (!gattServer.connected) {
+        throw new Error('Connection lost after connect');
+      }
+
+      epdService = await gattServer.getPrimaryService('62750001-d828-918d-fb46-b6c11c675aec');
+      addLog('  找到 EPD Service');
+      epdCharacteristic = await epdService.getCharacteristic('62750002-d828-918d-fb46-b6c11c675aec');
+      addLog('  找到 Characteristic');
+
+      // 连接成功，跳出重试循环
+      break;
+    } catch (e) {
+      console.error(e);
+      if (retry < MAX_CONNECT_RETRIES - 1) {
+        addLog(`连接失败: ${e.message}，准备重试...`);
+        // 清理状态准备重试
+        gattServer = null;
+        epdService = null;
+        epdCharacteristic = null;
+      } else {
+        // 最后一次重试也失败
+        if (e.message) addLog("connect: " + e.message);
+        disconnect();
+        return;
+      }
+    }
   }
 
   try {
@@ -420,6 +565,7 @@ async function connect() {
     const versionData = await versionCharacteristic.readValue();
     appVersion = versionData.getUint8(0);
     addLog(`固件版本: 0x${appVersion.toString(16)}`);
+    addLog(`APP版本: v${APP_VERSION} (${APP_BUILD_DATE})`);
   } catch (e) {
     console.error(e);
     appVersion = 0x15;
@@ -439,12 +585,19 @@ async function connect() {
     epdCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
       handleNotify(event.target.value, msgIndex++);
     });
+    // 给系统一点时间完成监听器挂载
+    await new Promise(r => setTimeout(r, 200));
   } catch (e) {
     console.error(e);
     if (e.message) addLog("startNotifications: " + e.message);
   }
 
   await write(EpdCmd.INIT);
+
+  // Initialize CRC transfer module if available
+  if (typeof BleTransfer !== 'undefined') {
+    BleTransfer.init();
+  }
 
   document.getElementById("connectbutton").innerHTML = '断开';
   updateButtonStatus();
@@ -479,7 +632,8 @@ function addLog(logTXT, action = '') {
   log.appendChild(logEntry);
   log.scrollTop = log.scrollHeight;
 
-  while (log.childNodes.length > 20) {
+  // 增加日志条数限制，方便手机端排查问题（例如查看CRC传输过程）
+  while (log.childNodes.length > 200) {
     log.removeChild(log.firstChild);
   }
 }
@@ -532,6 +686,10 @@ function updateCanvasSize() {
   canvas.height = selectedSize.height;
 
   updateImage();
+  // 尺寸变化后，重绘所有矢量元素（文字、线条等）
+  if (paintManager) {
+    paintManager.redrawAll();
+  }
 }
 
 function updateDitcherOptions() {
@@ -628,7 +786,7 @@ function checkDebugMode() {
 document.body.onload = () => {
   textDecoder = null;
   canvas = document.getElementById('canvas');
-  ctx = canvas.getContext("2d");
+  ctx = canvas.getContext("2d", { willReadFrequently: true });
 
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -47,7 +47,7 @@ class PaintManager {
     // Undo/Redo functionality
     this.historyStack = [];
     this.historyStep = -1;
-    this.MAX_HISTORY = 50;
+    this.MAX_HISTORY = 25; // 降低历史记录上限，防止手机端内存溢出 (50 -> 25)
 
     // Bind event handlers
     this.startPaint = this.startPaint.bind(this);
@@ -92,10 +92,12 @@ class PaintManager {
 
   saveCanvasToLocalStorage() {
     try {
+      // 使用压缩的数据格式避免超出配额
       const canvasData = {
-        imageData: this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height).data.join(','),
+        // 使用canvas.toDataURL代替原始imageData，更节省空间
+        imageDataUrl: this.canvas.toDataURL('image/png', 0.8),
         textElements: this.textElements,
-        lineSegments: this.lineSegments,
+        lineSegments: this.lineSegments.slice(-100), // 只保留最近100个线段
         todoItems: this.todoItems,
         scheduleData: this.scheduleData,
         width: this.canvas.width,
@@ -103,7 +105,26 @@ class PaintManager {
       };
       localStorage.setItem('canvasState', JSON.stringify(canvasData));
     } catch (e) {
-      console.error('Failed to save canvas to localStorage:', e);
+      if (e.name === 'QuotaExceededError') {
+        // 空间不足时，清理旧数据后重试
+        console.warn('localStorage quota exceeded, clearing old data...');
+        try {
+          localStorage.removeItem('canvasState');
+          // 简化存储，只保存必要元素
+          const minimalData = {
+            textElements: this.textElements,
+            todoItems: this.todoItems,
+            scheduleData: this.scheduleData,
+            width: this.canvas.width,
+            height: this.canvas.height
+          };
+          localStorage.setItem('canvasState', JSON.stringify(minimalData));
+        } catch (e2) {
+          console.error('Failed to save minimal canvas data:', e2);
+        }
+      } else {
+        console.error('Failed to save canvas to localStorage:', e);
+      }
     }
   }
 
@@ -119,11 +140,32 @@ class PaintManager {
         return false;
       }
 
-      // Restore image data
-      const imageArray = canvasData.imageData.split(',').map(Number);
-      const imageData = this.ctx.createImageData(this.canvas.width, this.canvas.height);
-      imageData.data.set(imageArray);
-      this.ctx.putImageData(imageData, 0, 0);
+      // Restore image data - support both new and old format
+      if (canvasData.imageDataUrl) {
+        // 新格式：使用DataURL
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            this.ctx.drawImage(img, 0, 0);
+            // Restore elements
+            this.textElements = canvasData.textElements || [];
+            this.lineSegments = canvasData.lineSegments || [];
+            this.todoItems = canvasData.todoItems || [];
+            this.scheduleData = canvasData.scheduleData || null;
+            this.saveToHistory();
+            resolve(true);
+          };
+          img.onerror = () => resolve(false);
+          img.src = canvasData.imageDataUrl;
+        });
+      } else if (canvasData.imageData) {
+        // 旧格式：使用原始像素数据
+        const imageArray = canvasData.imageData.split(',').map(Number);
+        const imageData = this.ctx.createImageData(this.canvas.width, this.canvas.height);
+        imageData.data.set(imageArray);
+        this.ctx.putImageData(imageData, 0, 0);
+      }
+      // 简化格式：无图像数据
 
       // Restore elements
       this.textElements = canvasData.textElements || [];
@@ -192,30 +234,39 @@ class PaintManager {
   }
 
   initPaintTools() {
-    document.getElementById('brush-mode').addEventListener('click', () => {
+    document.getElementById('brush-mode').addEventListener('click', async () => {
       if (this.currentTool === 'brush') {
         this.setActiveTool(null, '');
       } else {
+        await this.loadCanvasFromLocalStorage();
+        this.scheduleData = null; // 切回普通模式时清除课表
         this.setActiveTool('brush', '画笔模式');
         this.brushColor = document.getElementById('brush-color').value;
+        this.redrawAll();
       }
     });
 
-    document.getElementById('eraser-mode').addEventListener('click', () => {
+    document.getElementById('eraser-mode').addEventListener('click', async () => {
       if (this.currentTool === 'eraser') {
         this.setActiveTool(null, '');
       } else {
+        await this.loadCanvasFromLocalStorage();
+        this.scheduleData = null; // 切回普通模式时清除课表
         this.setActiveTool('eraser', '橡皮擦');
         this.brushColor = "#FFFFFF";
+        this.redrawAll();
       }
     });
 
-    document.getElementById('text-mode').addEventListener('click', () => {
+    document.getElementById('text-mode').addEventListener('click', async () => {
       if (this.currentTool === 'text') {
         this.setActiveTool(null, '');
       } else {
+        await this.loadCanvasFromLocalStorage();
+        this.scheduleData = null; // 切回普通模式时清除课表
         this.setActiveTool('text', '插入文字');
         this.brushColor = document.getElementById('brush-color').value;
+        this.redrawAll();
       }
     });
 
@@ -230,25 +281,27 @@ class PaintManager {
 
     document.getElementById('add-text-btn').addEventListener('click', () => this.startTextPlacement());
 
-    document.getElementById('todo-mode').addEventListener('click', () => {
+    document.getElementById('todo-mode').addEventListener('click', async () => {
       if (this.currentTool === 'todo') {
         this.setActiveTool(null, '');
       } else {
         // Load cached canvas data if available
-        this.loadCanvasFromLocalStorage();
+        await this.loadCanvasFromLocalStorage();
+        this.scheduleData = null; // 切回待办模式时清除课表
         this.setActiveTool('todo', '添加待办项');
         this.brushColor = document.getElementById('brush-color').value;
+        this.redrawAll();
       }
     });
 
     document.getElementById('add-todo-btn').addEventListener('click', () => this.startTodoPlacement());
 
-    document.getElementById('schedule-mode').addEventListener('click', () => {
+    document.getElementById('schedule-mode').addEventListener('click', async () => {
       if (this.currentTool === 'schedule') {
         this.setActiveTool(null, '');
       } else {
         // Load cached schedule data if available
-        this.loadScheduleFromLocalStorage();
+        await this.loadScheduleFromLocalStorage();
         this.setActiveTool('schedule', '生成课表');
       }
     });
@@ -376,10 +429,10 @@ class PaintManager {
     this.canvas.addEventListener('mouseleave', this.endPaint);
     this.canvas.addEventListener('click', this.handleCanvasClick);
 
-    // Touch support
-    this.canvas.addEventListener('touchstart', this.onTouchStart);
-    this.canvas.addEventListener('touchmove', this.onTouchMove);
-    this.canvas.addEventListener('touchend', this.onTouchEnd);
+    // Touch support (Set passive: false to allow preventDefault for scrolling prevention)
+    this.canvas.addEventListener('touchstart', this.onTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove', this.onTouchMove, { passive: false });
+    this.canvas.addEventListener('touchend', this.onTouchEnd, { passive: false });
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', this.handleKeyboard);
@@ -1313,7 +1366,7 @@ class PaintManager {
     }
   }
 
-  loadScheduleFromLocalStorage() {
+  async loadScheduleFromLocalStorage() {
     try {
       const savedData = localStorage.getItem('scheduleCache');
       if (!savedData) return false;
@@ -1332,7 +1385,13 @@ class PaintManager {
       this.calculateScheduleDimensions();
 
       if (this.scheduleData) {
-        this.drawSchedule();
+        // Clear other elements to ensure a clean schedule view, matching createSchedule behavior
+        this.lineSegments = [];
+        this.textElements = [];
+        this.todoItems = [];
+
+        // Use redrawAll to clear canvas and draw the schedule correctly
+        this.redrawAll();
         return true;
       }
       return false;

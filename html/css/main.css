@@ -30,6 +30,7 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     line-height: 1.6;
+    touch-action: manipulation; /* 提升移动端点击响应速度 */
 }
 
 button {

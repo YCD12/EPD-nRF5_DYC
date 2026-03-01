@@ -18,6 +18,7 @@ class PaintManager {
     this.dragOffsetY = 0;
     this.textBold = false;
     this.textItalic = false;
+    this.selectedEditingText = null; // For re-editing existing text elements
     this.todoItems = [];
     this.isTodoPlacementMode = false;
     this.selectedTodoItem = null;
@@ -40,6 +41,7 @@ class PaintManager {
     this.weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     this.selectedScheduleCell = null; // For editing schedule cells
     this.showScheduleCellIndicator = true; // Toggle for showing/hiding cell selection indicator
+    this.scheduleCellFontSizes = null; // 2D array for per-cell font sizes
 
     // Brush cursor indicator
     this.brushCursor = null;
@@ -318,35 +320,56 @@ class PaintManager {
 
     document.getElementById('schedule-input-confirm-btn').addEventListener('click', () => this.confirmScheduleInput());
     document.getElementById('schedule-input-cancel-btn').addEventListener('click', () => this.cancelScheduleInput());
-    document.getElementById('schedule-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') this.confirmScheduleInput();
-    });
 
-    // Schedule font size adjustment buttons
+    // Schedule font size adjustment buttons (context-aware: per-cell when selected, global otherwise)
     document.getElementById('schedule-font-increase-btn').addEventListener('click', () => {
-      this.scheduleFontSize = Math.min(this.scheduleFontSize + 1, 32);
-      document.getElementById('schedule-font-size').value = this.scheduleFontSize;
-      if (this.scheduleData) {
-        this.calculateScheduleDimensions();
+      if (this.selectedScheduleCell && this.scheduleCellFontSizes) {
+        const { row, col } = this.selectedScheduleCell;
+        this.scheduleCellFontSizes[row][col] = Math.min(this.scheduleCellFontSizes[row][col] + 1, 32);
+        document.getElementById('schedule-font-size').value = this.scheduleCellFontSizes[row][col];
         this.redrawAll();
+        this.saveScheduleToLocalStorage();
+      } else {
+        this.scheduleFontSize = Math.min(this.scheduleFontSize + 1, 32);
+        document.getElementById('schedule-font-size').value = this.scheduleFontSize;
+        if (this.scheduleData) {
+          this.calculateScheduleDimensions();
+          this.redrawAll();
+        }
       }
     });
 
     document.getElementById('schedule-font-decrease-btn').addEventListener('click', () => {
-      this.scheduleFontSize = Math.max(this.scheduleFontSize - 1, 8);
-      document.getElementById('schedule-font-size').value = this.scheduleFontSize;
-      if (this.scheduleData) {
-        this.calculateScheduleDimensions();
+      if (this.selectedScheduleCell && this.scheduleCellFontSizes) {
+        const { row, col } = this.selectedScheduleCell;
+        this.scheduleCellFontSizes[row][col] = Math.max(this.scheduleCellFontSizes[row][col] - 1, 6);
+        document.getElementById('schedule-font-size').value = this.scheduleCellFontSizes[row][col];
         this.redrawAll();
+        this.saveScheduleToLocalStorage();
+      } else {
+        this.scheduleFontSize = Math.max(this.scheduleFontSize - 1, 8);
+        document.getElementById('schedule-font-size').value = this.scheduleFontSize;
+        if (this.scheduleData) {
+          this.calculateScheduleDimensions();
+          this.redrawAll();
+        }
       }
     });
 
     // Schedule font size input change
     document.getElementById('schedule-font-size').addEventListener('change', (e) => {
-      this.scheduleFontSize = parseInt(e.target.value);
-      if (this.scheduleData) {
-        this.calculateScheduleDimensions();
+      const val = parseInt(e.target.value);
+      if (this.selectedScheduleCell && this.scheduleCellFontSizes) {
+        const { row, col } = this.selectedScheduleCell;
+        this.scheduleCellFontSizes[row][col] = Math.max(6, Math.min(32, val));
         this.redrawAll();
+        this.saveScheduleToLocalStorage();
+      } else {
+        this.scheduleFontSize = val;
+        if (this.scheduleData) {
+          this.calculateScheduleDimensions();
+          this.redrawAll();
+        }
       }
     });
 
@@ -586,9 +609,27 @@ class PaintManager {
     if (!this.currentTool) return;
 
     if (this.currentTool === 'text') {
-      // Check if we're clicking on a text element to drag
+      // Check if we're clicking on a text element to drag/edit
       const textElement = this.findTextElementAt(e);
       if (textElement) {
+        // Select for editing: populate UI fields
+        this.selectedEditingText = textElement;
+        document.getElementById('text-input').value = textElement.text;
+        const fontMatch = textElement.font.match(/(\d+)px\s+(.*)/);
+        if (fontMatch) {
+          document.getElementById('font-size').value = fontMatch[1];
+          document.getElementById('font-family').value = fontMatch[2];
+        }
+        this.textBold = /bold/.test(textElement.font);
+        this.textItalic = /italic/.test(textElement.font);
+        document.getElementById('text-bold').classList.toggle('primary', this.textBold);
+        document.getElementById('text-italic').classList.toggle('primary', this.textItalic);
+        document.getElementById('brush-color').value = textElement.color;
+        this.brushColor = textElement.color;
+        document.getElementById('add-text-btn').textContent = '更新文字';
+        this.redrawAll();
+
+        // Allow dragging
         this.isDraggingText = true;
         this.selectedTextElement = textElement;
 
@@ -732,6 +773,11 @@ class PaintManager {
   handleCanvasClick(e) {
     if (this.currentTool === 'text' && this.isTextPlacementMode) {
       this.placeText(e);
+    } else if (this.currentTool === 'text' && !this.isTextPlacementMode) {
+      // Click on empty area → deselect editing text
+      if (this.selectedEditingText && !this.findTextElementAt(e)) {
+        this.deselectEditingText();
+      }
     } else if (this.currentTool === 'todo' && this.isTodoPlacementMode) {
       this.placeTodo(e);
     } else if (this.currentTool === 'schedule') {
@@ -742,10 +788,16 @@ class PaintManager {
         const currentText = this.scheduleData[cell.row][cell.col];
         document.getElementById('schedule-input').value = currentText;
         document.getElementById('schedule-input').focus();
-        // Show the input buttons by making the second flex-group visible
+        // Show per-cell font size in the global font size input
+        if (this.scheduleCellFontSizes) {
+          document.getElementById('schedule-font-size').value = this.scheduleCellFontSizes[cell.row][cell.col];
+        }
+        // Redraw to show selection indicator
+        this.redrawAll();
+        // Show the input area
         const allScheduleTools = document.querySelectorAll('.schedule-tools');
-        if (allScheduleTools.length > 1) {
-          allScheduleTools[1].style.display = 'flex';
+        if (allScheduleTools.length > 2) {
+          allScheduleTools[2].style.display = 'flex';
         }
       }
     }
@@ -973,6 +1025,12 @@ class PaintManager {
   }
 
   startTextPlacement() {
+    // If editing an existing text element, update it
+    if (this.selectedEditingText) {
+      this.updateSelectedText();
+      return;
+    }
+
     const text = document.getElementById('text-input').value.trim();
     if (!text) {
       alert('请输入文字内容');
@@ -998,6 +1056,46 @@ class PaintManager {
     this.selectedTextElement = null;
     this.selectedTodoItem = null;
     this.draggingCanvasContext = null;
+
+    // Deselect editing text
+    if (this.selectedEditingText) {
+      this.selectedEditingText = null;
+      document.getElementById('text-input').value = '';
+      document.getElementById('add-text-btn').textContent = '添加文字';
+    }
+  }
+
+  updateSelectedText() {
+    if (!this.selectedEditingText) return;
+
+    const text = document.getElementById('text-input').value;
+    const fontFamily = document.getElementById('font-family').value;
+    const fontSize = document.getElementById('font-size').value;
+
+    let fontStyle = '';
+    if (this.textItalic) fontStyle += 'italic ';
+    if (this.textBold) fontStyle += 'bold ';
+
+    this.selectedEditingText.text = text;
+    this.selectedEditingText.font = `${fontStyle}${fontSize}px ${fontFamily}`;
+    this.selectedEditingText.color = this.brushColor;
+
+    // Remove if text is empty
+    if (!text.trim()) {
+      const index = this.textElements.indexOf(this.selectedEditingText);
+      if (index > -1) this.textElements.splice(index, 1);
+    }
+
+    this.redrawAll();
+    this.saveToHistory();
+    this.deselectEditingText();
+  }
+
+  deselectEditingText() {
+    this.selectedEditingText = null;
+    document.getElementById('text-input').value = '';
+    document.getElementById('add-text-btn').textContent = '添加文字';
+    this.redrawAll();
   }
 
   placeText(e) {
@@ -1054,6 +1152,26 @@ class PaintManager {
       this.ctx.fillStyle = item.color;
       this.ctx.fillText(item.text, item.x, item.y);
     });
+
+    // Draw selection indicator for editing text
+    if (this.selectedEditingText) {
+      const item = this.selectedEditingText;
+      this.ctx.font = item.font;
+      const textWidth = this.ctx.measureText(item.text).width;
+      const fontSizeMatch = item.font.match(/(\d+)px/);
+      const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 14;
+      const padding = 4;
+      this.ctx.strokeStyle = '#0000FF';
+      this.ctx.lineWidth = 1;
+      this.ctx.setLineDash([4, 3]);
+      this.ctx.strokeRect(
+        item.x - padding,
+        item.y - fontSize - padding,
+        textWidth + padding * 2,
+        fontSize * 1.3 + padding * 2
+      );
+      this.ctx.setLineDash([]);
+    }
   }
 
   redrawLineSegments() {
@@ -1201,9 +1319,12 @@ class PaintManager {
 
     // Initialize schedule data (2D array: rows = classes + 1 (header), cols = days + 1 (time col))
     this.scheduleData = [];
+    this.scheduleCellFontSizes = [];
     for (let i = 0; i <= this.scheduleClasses; i++) {
       this.scheduleData[i] = [];
+      this.scheduleCellFontSizes[i] = [];
       for (let j = 0; j <= this.scheduleDays; j++) {
+        this.scheduleCellFontSizes[i][j] = this.scheduleFontSize;
         if (i === 0 && j === 0) {
           this.scheduleData[i][j] = ''; // Top-left corner - leave empty
         } else if (i === 0) {
@@ -1248,9 +1369,7 @@ class PaintManager {
     const cellHeight = this.scheduleCellHeight;
     const startX = this.scheduleStartX;
     const startY = this.scheduleStartY;
-    const font = `${this.scheduleFontSize}px ${this.scheduleFontFamily}`;
 
-    this.ctx.font = font;
     this.ctx.fillStyle = this.scheduleColor;
     this.ctx.strokeStyle = '#000000';
     this.ctx.lineWidth = 1;
@@ -1264,12 +1383,26 @@ class PaintManager {
         // Draw cell border
         this.ctx.strokeRect(x, y, cellWidth, cellHeight);
 
-        // Draw cell text
+        // Draw cell text with per-cell font size and multi-line support
         const text = this.scheduleData[i][j];
         if (text) {
-          const textX = x + cellWidth / 2 - this.ctx.measureText(text).width / 2;
-          const textY = y + cellHeight / 2 + this.scheduleFontSize / 3;
-          this.ctx.fillText(text, textX, textY);
+          const cellFontSize = (this.scheduleCellFontSizes && this.scheduleCellFontSizes[i] && this.scheduleCellFontSizes[i][j])
+            ? this.scheduleCellFontSizes[i][j] : this.scheduleFontSize;
+          const font = `${cellFontSize}px ${this.scheduleFontFamily}`;
+          this.ctx.font = font;
+          this.ctx.fillStyle = this.scheduleColor;
+
+          const lines = text.split('\n');
+          const lineHeight = cellFontSize * 1.2;
+          const totalTextHeight = lines.length * lineHeight;
+          const textStartY = y + (cellHeight - totalTextHeight) / 2 + cellFontSize * 0.85;
+
+          for (let l = 0; l < lines.length; l++) {
+            const lineText = lines[l];
+            const textX = x + (cellWidth - this.ctx.measureText(lineText).width) / 2;
+            const textY = textStartY + l * lineHeight;
+            this.ctx.fillText(lineText, textX, textY);
+          }
         }
       }
     }
@@ -1335,10 +1468,12 @@ class PaintManager {
   cancelScheduleInput() {
     this.selectedScheduleCell = null;
     document.getElementById('schedule-input').value = '';
+    // Restore global font size display
+    document.getElementById('schedule-font-size').value = this.scheduleFontSize;
     // Hide the input buttons
     const allScheduleTools = document.querySelectorAll('.schedule-tools');
-    if (allScheduleTools.length > 1) {
-      allScheduleTools[1].style.display = 'none';
+    if (allScheduleTools.length > 2) {
+      allScheduleTools[2].style.display = 'none';
     }
     // Redraw to remove the selection indicator
     if (this.scheduleData) {
@@ -1358,7 +1493,8 @@ class PaintManager {
         scheduleCellWidth: this.scheduleCellWidth,
         scheduleCellHeight: this.scheduleCellHeight,
         scheduleStartX: this.scheduleStartX,
-        scheduleStartY: this.scheduleStartY
+        scheduleStartY: this.scheduleStartY,
+        scheduleCellFontSizes: this.scheduleCellFontSizes
       };
       localStorage.setItem('scheduleCache', JSON.stringify(scheduleCache));
     } catch (e) {
@@ -1380,6 +1516,18 @@ class PaintManager {
       this.scheduleFontFamily = scheduleCache.scheduleFontFamily;
       this.scheduleFontSize = scheduleCache.scheduleFontSize;
       this.scheduleColor = scheduleCache.scheduleColor;
+      this.scheduleCellFontSizes = scheduleCache.scheduleCellFontSizes || null;
+
+      // Initialize scheduleCellFontSizes if missing (old cache compatibility)
+      if (!this.scheduleCellFontSizes && this.scheduleData) {
+        this.scheduleCellFontSizes = [];
+        for (let i = 0; i < this.scheduleData.length; i++) {
+          this.scheduleCellFontSizes[i] = [];
+          for (let j = 0; j < this.scheduleData[i].length; j++) {
+            this.scheduleCellFontSizes[i][j] = this.scheduleFontSize;
+          }
+        }
+      }
 
       // Recalculate dimensions based on current canvas size for proper adaptation
       this.calculateScheduleDimensions();
@@ -1414,5 +1562,6 @@ class PaintManager {
     this.lineSegments = [];
     this.todoItems = [];
     this.scheduleData = null; // Clear schedule data
+    this.scheduleCellFontSizes = null; // Clear per-cell font sizes
   }
 }

@@ -268,6 +268,16 @@ async function sendimg() {
     return;
   }
 
+  // Clear schedule selection indicator before sending
+  if (paintManager && paintManager.selectedScheduleCell) {
+    paintManager.cancelScheduleInput();
+  }
+
+  // Clear text selection indicator before sending
+  if (paintManager && paintManager.selectedEditingText) {
+    paintManager.deselectEditingText();
+  }
+
   const canvasSize = document.getElementById('canvasSize').value;
   const ditherMode = document.getElementById('ditherMode').value;
   const epdDriverSelect = document.getElementById('epddriver');

@@ -361,6 +361,100 @@ canvas.text-placement-mode {
     display: none;
 }
 
+.device-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.device-modal-content {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    padding: 1rem;
+}
+
+.device-modal-header h3 {
+    margin: 0 0 0.5rem 0;
+}
+
+.device-modal-hint {
+    color: #64748b;
+    margin-bottom: 0.75rem;
+}
+
+.device-modal-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--section-bg);
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+}
+
+.device-modal-item {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.5rem;
+    text-align: left;
+}
+
+.device-modal-item:last-child {
+    margin-bottom: 0;
+}
+
+.device-modal-item:hover {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+}
+
+.device-modal-item .name {
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.device-modal-item .recommended {
+    display: inline-block;
+    margin-right: 0.5rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: #16a34a;
+}
+
+.device-modal-item .rssi {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.device-modal-empty {
+    color: #64748b;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+.device-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
 @media (max-width: 768px) {
     .flex-container {
         flex-direction: column;
@@ -509,4 +603,31 @@ body.dark-mode .tool-button.active {
     background-color: var(--primary-color);
     color: white;
     border-color: var(--primary-hover);
+}
+
+body.dark-mode .device-modal-content {
+    background: var(--dark-section-bg);
+    color: var(--dark-text);
+    border-color: var(--dark-border);
+}
+
+body.dark-mode .device-modal-list {
+    background: var(--dark-bg);
+    border-color: var(--dark-border);
+}
+
+body.dark-mode .device-modal-item {
+    background: var(--dark-input-bg);
+    color: var(--dark-text);
+    border-color: var(--dark-border);
+}
+
+body.dark-mode .device-modal-item:hover {
+    background: #243447;
+    border-color: var(--primary-color);
+}
+
+body.dark-mode .device-modal-item .recommended {
+    background: #22c55e;
+    color: #0f172a;
 }

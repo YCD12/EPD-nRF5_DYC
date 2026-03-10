@@ -6,7 +6,10 @@ let paintManager, cropManager;
 
 // APP版本号 (便于调试)
 const APP_VERSION = '2.0.3';
-const APP_BUILD_DATE = '2026-02-03';
+const APP_BUILD_DATE = '2026-03-10';
+const EPD_DEVICE_NAME_PREFIX = 'NRF_EPD';
+const SCAN_DURATION_MS = 5000;
+let enableDeviceFilter = true;
 
 const EpdCmd = {
   SET_PINS: 0x00,
@@ -412,6 +415,229 @@ function disconnect() {
   if (legacyBtn) legacyBtn.style.display = 'none';
 }
 
+function updateDeviceFilterButton() {
+  const button = document.getElementById('deviceFilterToggle');
+  if (!button) return;
+  button.innerText = enableDeviceFilter ? '不过滤设备' : '启用NRF_EPD过滤';
+  button.title = enableDeviceFilter ? '当前仅显示NRF_EPD设备，点击后显示全部蓝牙设备' : '当前显示全部蓝牙设备，点击后仅显示NRF_EPD设备';
+}
+
+function toggleDeviceFilter() {
+  enableDeviceFilter = !enableDeviceFilter;
+  updateDeviceFilterButton();
+  if (enableDeviceFilter) {
+    addLog(`设备过滤已启用，仅显示 ${EPD_DEVICE_NAME_PREFIX} 开头设备`);
+  } else {
+    addLog('设备过滤已关闭，将显示全部蓝牙设备');
+  }
+}
+
+function showDeviceSelectModal(candidates, refreshCandidatesFn = null) {
+  const modal = document.getElementById('deviceSelectModal');
+  const list = document.getElementById('deviceModalList');
+  const hint = document.getElementById('deviceModalHint');
+  const cancelBtn = document.getElementById('deviceModalCancel');
+  const refreshBtn = document.getElementById('deviceModalRefresh');
+
+  if (!modal || !list || !hint || !cancelBtn || !refreshBtn) {
+    addLog('设备选择弹窗不可用，请刷新页面后重试');
+    return Promise.resolve({
+      selected: null,
+      refreshAttempted: false,
+      latestCount: candidates.length,
+      lastScanStatus: 'ok'
+    });
+  }
+
+  let currentCandidates = candidates.slice();
+  modal.style.display = 'flex';
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let refreshAttempted = false;
+    let lastScanStatus = 'ok';
+
+    const updateHint = () => {
+      hint.innerText = `检测到 ${currentCandidates.length} 个 ${EPD_DEVICE_NAME_PREFIX} 设备（已按信号强度排序，越靠前越强）`;
+    };
+
+    const close = (selected) => {
+      if (settled) return;
+      settled = true;
+      modal.style.display = 'none';
+      modal.removeEventListener('click', onOverlayClick);
+      cancelBtn.removeEventListener('click', onCancel);
+      refreshBtn.removeEventListener('click', onRefresh);
+      document.removeEventListener('keydown', onKeydown);
+      refreshBtn.disabled = false;
+      refreshBtn.innerText = '刷新扫描';
+      resolve({
+        selected,
+        refreshAttempted,
+        latestCount: currentCandidates.length,
+        lastScanStatus
+      });
+    };
+    const renderCandidateList = () => {
+      list.innerHTML = '';
+      if (currentCandidates.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'device-modal-empty';
+        empty.innerText = `未扫描到 ${EPD_DEVICE_NAME_PREFIX} 设备，请点击“刷新扫描”重试`;
+        list.appendChild(empty);
+        return;
+      }
+      currentCandidates.forEach((candidate, index) => {
+        const rssiText = Number.isFinite(candidate.rssi) ? `${candidate.rssi} dBm` : 'RSSI未知';
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'device-modal-item';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'name';
+        nameSpan.textContent = `${index + 1}. ${candidate.name}`;
+        item.appendChild(nameSpan);
+
+        if (index === 0) {
+          const recommendedSpan = document.createElement('span');
+          recommendedSpan.className = 'recommended';
+          recommendedSpan.textContent = '推荐';
+          item.appendChild(recommendedSpan);
+        }
+
+        const rssiSpan = document.createElement('span');
+        rssiSpan.className = 'rssi';
+        rssiSpan.textContent = rssiText;
+        item.appendChild(rssiSpan);
+
+        item.addEventListener('click', () => close(candidate));
+        list.appendChild(item);
+      });
+    };
+
+    const onCancel = () => close(null);
+    const onOverlayClick = (event) => {
+      if (event.target === modal) close(null);
+    };
+    const onKeydown = (event) => {
+      if (event.key === 'Escape') close(null);
+    };
+    const onRefresh = async () => {
+      if (!refreshCandidatesFn) return;
+      refreshAttempted = true;
+      refreshBtn.disabled = true;
+      refreshBtn.innerText = '扫描中...';
+      hint.innerText = `正在扫描 ${EPD_DEVICE_NAME_PREFIX} 设备，请稍候...`;
+      try {
+        const refreshed = await refreshCandidatesFn();
+        if (refreshed && refreshed.status === 'ok') {
+          lastScanStatus = 'ok';
+          currentCandidates = refreshed.candidates || [];
+          updateHint();
+          renderCandidateList();
+        } else if (refreshed && refreshed.status === 'unsupported') {
+          lastScanStatus = 'unsupported';
+          hint.innerText = `当前浏览器不支持信号扫描排序，请改用“不过滤设备”或系统筛选`;
+        }
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.innerText = '刷新扫描';
+      }
+    };
+
+    cancelBtn.addEventListener('click', onCancel);
+    refreshBtn.addEventListener('click', onRefresh);
+    modal.addEventListener('click', onOverlayClick);
+    document.addEventListener('keydown', onKeydown);
+
+    updateHint();
+    renderCandidateList();
+  });
+}
+
+async function scanFilteredDevices() {
+  if (!navigator.bluetooth.requestLEScan) {
+    return { status: 'unsupported', candidates: [] };
+  }
+
+  const discovered = new Map();
+  const onAdvertisement = (event) => {
+    const name = event.device?.name || '';
+    if (!name.startsWith(EPD_DEVICE_NAME_PREFIX)) return;
+    discovered.set(event.device.id, {
+      device: event.device,
+      name: name,
+      rssi: event.rssi
+    });
+  };
+
+  let scan;
+  try {
+    scan = await navigator.bluetooth.requestLEScan({
+      acceptAllAdvertisements: true,
+      keepRepeatedDevices: true
+    });
+    navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
+    addLog(`正在扫描 ${EPD_DEVICE_NAME_PREFIX} 设备(${SCAN_DURATION_MS / 1000}s)...`);
+    await new Promise(resolve => setTimeout(resolve, SCAN_DURATION_MS));
+  } catch (e) {
+    console.error(e);
+    addLog(`蓝牙扫描不可用，将退回系统设备选择: ${e.message}`);
+    return { status: 'unsupported', candidates: [] };
+  } finally {
+    navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement);
+    if (scan) scan.stop();
+  }
+
+  const candidates = Array.from(discovered.values())
+    .sort((a, b) => (Number.isFinite(b.rssi) ? b.rssi : -999) - (Number.isFinite(a.rssi) ? a.rssi : -999));
+
+  if (candidates.length === 0) {
+    addLog(`扫描完成，未发现 ${EPD_DEVICE_NAME_PREFIX} 设备`);
+  } else {
+    const best = candidates[0];
+    const bestRssiText = Number.isFinite(best.rssi) ? `${best.rssi} dBm` : 'RSSI未知';
+    addLog(`扫描完成，发现 ${candidates.length} 个目标设备，最强信号: ${best.name}(${bestRssiText})`);
+  }
+  return { status: 'ok', candidates };
+}
+
+async function requestBleDevice() {
+  if (!enableDeviceFilter) {
+    addLog('设备过滤已关闭，打开系统蓝牙选择窗口(全部设备)');
+    return await navigator.bluetooth.requestDevice({
+      optionalServices: ['62750001-d828-918d-fb46-b6c11c675aec'],
+      acceptAllDevices: true
+    });
+  }
+
+  const scanResult = await scanFilteredDevices();
+  if (scanResult.status === 'unsupported') {
+    addLog(`当前浏览器不支持信号扫描排序，退回系统窗口并仅筛选 ${EPD_DEVICE_NAME_PREFIX} 设备`);
+    return await navigator.bluetooth.requestDevice({
+      optionalServices: ['62750001-d828-918d-fb46-b6c11c675aec'],
+      filters: [{ namePrefix: EPD_DEVICE_NAME_PREFIX }]
+    });
+  }
+  const modalResult = await showDeviceSelectModal(scanResult.candidates, scanFilteredDevices);
+  const selected = modalResult ? modalResult.selected : null;
+  if (!selected) {
+    const shouldShowNotFoundAlert = modalResult &&
+      modalResult.latestCount === 0 &&
+      modalResult.refreshAttempted &&
+      modalResult.lastScanStatus === 'ok';
+    if (shouldShowNotFoundAlert) {
+      addLog(`未扫描到 ${EPD_DEVICE_NAME_PREFIX} 设备，请先让设备进入配对模式后重试`);
+      alert(
+        `未发现 ${EPD_DEVICE_NAME_PREFIX} 开头设备。\n\n请先让设备进入配对模式并重新搜索。\n如果再次搜索仍没有目标设备，请点击“不过滤设备”按钮，显示所有蓝牙设备后再连接。`
+      );
+    }
+    return null;
+  }
+  const rssiText = Number.isFinite(selected.rssi) ? `${selected.rssi} dBm` : 'RSSI未知';
+  addLog(`已选择目标设备: ${selected.name} (${rssiText})`);
+  return selected.device;
+}
+
 async function preConnect() {
   if (gattServer != null && gattServer.connected) {
     if (bleDevice != null && bleDevice.gatt.connected) {
@@ -421,10 +647,8 @@ async function preConnect() {
   else {
     resetVariables();
     try {
-      bleDevice = await navigator.bluetooth.requestDevice({
-        optionalServices: ['62750001-d828-918d-fb46-b6c11c675aec'],
-        acceptAllDevices: true
-      });
+      bleDevice = await requestBleDevice();
+      if (!bleDevice) return;
     } catch (e) {
       console.error(e);
       if (e.message) addLog("requestDevice: " + e.message);
@@ -793,6 +1017,22 @@ function checkDebugMode() {
   }
 }
 
+function updateFooterInfo() {
+  const footerCopy = document.getElementById('footerCopy');
+  const footerVersion = document.getElementById('footerVersion');
+
+  if (footerVersion) {
+    footerVersion.innerText = `总版本: v${APP_VERSION} | 更新时间: ${APP_BUILD_DATE}`;
+  }
+
+  if (footerCopy) {
+    const yearFromBuildDate = APP_BUILD_DATE && APP_BUILD_DATE.length >= 4
+      ? APP_BUILD_DATE.substring(0, 4)
+      : `${new Date().getFullYear()}`;
+    footerCopy.innerHTML = `&copy;Source from tsl0922, modify by DYC ${yearFromBuildDate}.`;
+  }
+}
+
 document.body.onload = () => {
   textDecoder = null;
   canvas = document.getElementById('canvas');
@@ -807,6 +1047,8 @@ document.body.onload = () => {
   paintManager.initPaintTools();
   cropManager.initCropTools();
   initEventHandlers();
+  updateDeviceFilterButton();
   updateButtonStatus();
+  updateFooterInfo();
   checkDebugMode();
 }

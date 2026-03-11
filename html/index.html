@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>墨水屏控制台</title>
 	<link rel="shortcut icon" type="image/png" href="favicon.png">
-	<link rel="stylesheet" href="css/main.css?v=20260310">
+	<link rel="stylesheet" href="css/main.css?v=20260310b">
 </head>
 
 <body>
@@ -152,9 +152,12 @@
 				</div>
 			</div>
 			<div class="status-bar"><b>状态：</b><span id="status"></span></div>
+			<div class="orientation-hint"><b>画面方向：</b><span id="orientationBadge">自动识别中...</span></div>
 			<div class="flex-container">
 				<div class="flex-group">
-					<button type="button" class="secondary debug" onclick="rotateCanvas()">旋转画布</button>
+					<button type="button" class="secondary" onclick="rotateCanvas()">旋转</button>
+					<button type="button" class="secondary" onclick="mirrorCanvas()">镜像(左右)</button>
+					<button type="button" class="secondary" onclick="flipCanvas()">翻转(上下)</button>
 					<button type="button" class="secondary" onclick="clearCanvas()">清除画布</button>
 					<button type="button" class="secondary debug" onclick="downloadDataArray()">下载数组</button>
 					<button id="sendimgbutton" type="button" class="primary" onclick="sendimg()">发送图片</button>
@@ -360,11 +363,12 @@
 			</div>
 		</div>
 	</div>
-	<script type="text/javascript" src="js/dithering.js?v=20260310"></script>
-	<script type="text/javascript" src="js/paint.js?v=20260310"></script>
-	<script type="text/javascript" src="js/crop.js?v=20260310"></script>
-	<script type="text/javascript" src="js/ble_transfer.js?v=20260310"></script>
-	<script type="text/javascript" src="js/main.js?v=20260310"></script>
+	<div id="toast" class="toast-message" style="display:none;"></div>
+	<script type="text/javascript" src="js/dithering.js?v=20260310c"></script>
+	<script type="text/javascript" src="js/paint.js?v=20260310c"></script>
+	<script type="text/javascript" src="js/crop.js?v=20260310c"></script>
+	<script type="text/javascript" src="js/ble_transfer.js?v=20260310c"></script>
+	<script type="text/javascript" src="js/main.js?v=20260310c"></script>
 </body>
 
 </html>

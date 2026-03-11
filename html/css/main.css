@@ -287,6 +287,36 @@ label {
     border-bottom: 1px dotted #AAA;
 }
 
+.orientation-hint {
+    font-size: 85%;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+#orientationBadge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: #f8fafc;
+}
+
+.toast-message {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 3000;
+    max-width: min(92vw, 520px);
+    padding: 0.55rem 0.9rem;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f8fafc;
+    font-size: 0.9rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
 canvas.text-placement-mode {
     border: 2px dashed var(--primary-color) !important;
     cursor: text !important;
@@ -569,6 +599,12 @@ body.dark-mode .log-container .time {
 
 body.dark-mode .log-container .action {
     color: #03a9f4;
+}
+
+body.dark-mode #orientationBadge {
+    background: var(--dark-input-bg);
+    border-color: var(--dark-border);
+    color: var(--dark-text);
 }
 
 

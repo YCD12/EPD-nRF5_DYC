@@ -867,9 +867,14 @@ class PaintManager {
     // Redraw all other text elements (except the one being dragged)
     this.textElements.forEach(item => {
       if (item !== this.selectedTextElement) {
+        const m = this.getItemTransformMatrix(item);
+        this.ctx.save();
+        this.ctx.translate(item.x, item.y);
+        this.ctx.transform(m.a, m.b, m.c, m.d, 0, 0);
         this.ctx.font = item.font;
         this.ctx.fillStyle = item.color;
-        this.ctx.fillText(item.text, item.x, item.y);
+        this.ctx.fillText(item.text, 0, 0);
+        this.ctx.restore();
       }
     });
 
@@ -877,9 +882,14 @@ class PaintManager {
     this.redrawTodoItems();
 
     // Draw the dragged text element on top
+    const m = this.getItemTransformMatrix(this.selectedTextElement);
+    this.ctx.save();
+    this.ctx.translate(this.selectedTextElement.x, this.selectedTextElement.y);
+    this.ctx.transform(m.a, m.b, m.c, m.d, 0, 0);
     this.ctx.font = this.selectedTextElement.font;
     this.ctx.fillStyle = this.selectedTextElement.color;
-    this.ctx.fillText(this.selectedTextElement.text, this.selectedTextElement.x, this.selectedTextElement.y);
+    this.ctx.fillText(this.selectedTextElement.text, 0, 0);
+    this.ctx.restore();
   }
 
   dragTodo(e) {
@@ -919,22 +929,14 @@ class PaintManager {
     // Search through text elements in reverse order (top-most first)
     for (let i = this.textElements.length - 1; i >= 0; i--) {
       const text = this.textElements[i];
-
-      // Calculate text dimensions
-      this.ctx.font = text.font;
-      const textWidth = this.ctx.measureText(text.text).width;
-
-      // Extract font size correctly from the font string
-      const fontSizeMatch = text.font.match(/(\d+)px/);
-      const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 14;
-      const textHeight = fontSize * 1.2; // Approximate height
+      const bounds = this.getTextBounds(text, text.text);
 
       // Check if click is within text bounds (allowing for some margin)
       const margin = 5;
-      if (x >= text.x - margin &&
-        x <= text.x + textWidth + margin &&
-        y >= text.y - textHeight + margin &&
-        y <= text.y + margin) {
+      if (x >= bounds.minX - margin &&
+        x <= bounds.maxX + margin &&
+        y >= bounds.minY - margin &&
+        y <= bounds.maxY + margin) {
         return text;
       }
     }
@@ -952,22 +954,14 @@ class PaintManager {
     // Search through todo items in reverse order (top-most first)
     for (let i = this.todoItems.length - 1; i >= 0; i--) {
       const todo = this.todoItems[i];
-
-      // Calculate text dimensions
-      this.ctx.font = todo.font;
-      const textWidth = this.ctx.measureText(todo.text).width;
-
-      // Extract font size correctly from the font string
-      const fontSizeMatch = todo.font.match(/(\d+)px/);
-      const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 14;
-      const textHeight = fontSize * 1.2; // Approximate height
+      const bounds = this.getTextBounds(todo, todo.text);
 
       // Check if click is within todo bounds (allowing for some margin)
       const margin = 5;
-      if (x >= todo.x - margin &&
-        x <= todo.x + textWidth + margin &&
-        y >= todo.y - textHeight + margin &&
-        y <= todo.y + margin) {
+      if (x >= bounds.minX - margin &&
+        x <= bounds.maxX + margin &&
+        y >= bounds.minY - margin &&
+        y <= bounds.maxY + margin) {
         return todo;
       }
     }
@@ -986,15 +980,15 @@ class PaintManager {
     for (let i = this.todoItems.length - 1; i >= 0; i--) {
       const todo = this.todoItems[i];
 
-      if (!todo.deleteButtonX || !todo.deleteButtonY || !todo.deleteButtonSize) {
+      if (!Number.isFinite(todo.deleteButtonCenterX) ||
+        !Number.isFinite(todo.deleteButtonCenterY) ||
+        !Number.isFinite(todo.deleteButtonHitRadius)) {
         continue;
       }
 
-      // Check if click is within delete button bounds
-      if (x >= todo.deleteButtonX - 5 &&
-        x <= todo.deleteButtonX + 10 &&
-        y >= todo.deleteButtonY &&
-        y <= todo.deleteButtonY + todo.deleteButtonSize) {
+      const dx = x - todo.deleteButtonCenterX;
+      const dy = y - todo.deleteButtonCenterY;
+      if (dx * dx + dy * dy <= todo.deleteButtonHitRadius * todo.deleteButtonHitRadius) {
         return todo;
       }
     }
@@ -1091,6 +1085,45 @@ class PaintManager {
     this.deselectEditingText();
   }
 
+  getItemTransformMatrix(item) {
+    return {
+      a: item && Number.isFinite(item.a) ? item.a : 1,
+      b: item && Number.isFinite(item.b) ? item.b : 0,
+      c: item && Number.isFinite(item.c) ? item.c : 0,
+      d: item && Number.isFinite(item.d) ? item.d : 1
+    };
+  }
+
+  transformLocalPoint(item, localX, localY) {
+    const m = this.getItemTransformMatrix(item);
+    return {
+      x: item.x + m.a * localX + m.c * localY,
+      y: item.y + m.b * localX + m.d * localY
+    };
+  }
+
+  getTextBounds(item, text) {
+    this.ctx.font = item.font;
+    const textWidth = this.ctx.measureText(text).width;
+    const fontSizeMatch = item.font.match(/(\d+)px/);
+    const textHeight = (fontSizeMatch ? parseInt(fontSizeMatch[1]) : 14) * 1.2;
+    const corners = [
+      this.transformLocalPoint(item, 0, -textHeight),
+      this.transformLocalPoint(item, textWidth, -textHeight),
+      this.transformLocalPoint(item, textWidth, 0),
+      this.transformLocalPoint(item, 0, 0)
+    ];
+    const xs = corners.map(p => p.x);
+    const ys = corners.map(p => p.y);
+    return {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+      textWidth
+    };
+  }
+
   deselectEditingText() {
     this.selectedEditingText = null;
     document.getElementById('text-input').value = '';
@@ -1120,7 +1153,11 @@ class PaintManager {
       x: x,
       y: y,
       font: `${fontStyle}${fontSize}px ${fontFamily}`,
-      color: this.brushColor
+      color: this.brushColor,
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1
     };
 
     // Add to our list of text elements
@@ -1148,27 +1185,29 @@ class PaintManager {
   redrawTextElements() {
     // Redraw all text elements after dithering
     this.textElements.forEach(item => {
+      const m = this.getItemTransformMatrix(item);
+      this.ctx.save();
+      this.ctx.translate(item.x, item.y);
+      this.ctx.transform(m.a, m.b, m.c, m.d, 0, 0);
       this.ctx.font = item.font;
       this.ctx.fillStyle = item.color;
-      this.ctx.fillText(item.text, item.x, item.y);
+      this.ctx.fillText(item.text, 0, 0);
+      this.ctx.restore();
     });
 
     // Draw selection indicator for editing text
     if (this.selectedEditingText) {
       const item = this.selectedEditingText;
-      this.ctx.font = item.font;
-      const textWidth = this.ctx.measureText(item.text).width;
-      const fontSizeMatch = item.font.match(/(\d+)px/);
-      const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1]) : 14;
+      const bounds = this.getTextBounds(item, item.text);
       const padding = 4;
       this.ctx.strokeStyle = '#0000FF';
       this.ctx.lineWidth = 1;
       this.ctx.setLineDash([4, 3]);
       this.ctx.strokeRect(
-        item.x - padding,
-        item.y - fontSize - padding,
-        textWidth + padding * 2,
-        fontSize * 1.3 + padding * 2
+        bounds.minX - padding,
+        bounds.minY - padding,
+        (bounds.maxX - bounds.minX) + padding * 2,
+        (bounds.maxY - bounds.minY) + padding * 2
       );
       this.ctx.setLineDash([]);
     }
@@ -1233,7 +1272,11 @@ class PaintManager {
       y: y,
       font: fontStyle,
       color: this.todoColor,
-      completed: false
+      completed: false,
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1
     };
 
     // Add to our list of todo items
@@ -1257,17 +1300,22 @@ class PaintManager {
   }
 
   drawTodoItem(todoItem) {
+    const m = this.getItemTransformMatrix(todoItem);
+    this.ctx.save();
+    this.ctx.translate(todoItem.x, todoItem.y);
+    this.ctx.transform(m.a, m.b, m.c, m.d, 0, 0);
+
     // Draw todo text
     this.ctx.font = todoItem.font;
     this.ctx.fillStyle = todoItem.color;
-    this.ctx.fillText(todoItem.text, todoItem.x, todoItem.y);
+    this.ctx.fillText(todoItem.text, 0, 0);
 
     // Only draw delete button if showTodoDeleteButtons is true
     if (this.showTodoDeleteButtons) {
       // Calculate delete button position
       const textWidth = this.ctx.measureText(todoItem.text).width;
-      const deleteButtonX = todoItem.x + textWidth + 5;
-      const deleteButtonY = todoItem.y;
+      const deleteButtonX = textWidth + 5;
+      const deleteButtonY = 0;
       const deleteButtonSize = 12;
 
       // Draw delete button "×"
@@ -1275,23 +1323,28 @@ class PaintManager {
       this.ctx.fillStyle = '#FF6B6B';
       this.ctx.fillText('×', deleteButtonX, deleteButtonY);
 
-      // Store delete button coordinates for hit detection
-      todoItem.deleteButtonX = deleteButtonX;
-      todoItem.deleteButtonY = deleteButtonY - deleteButtonSize;
-      todoItem.deleteButtonSize = deleteButtonSize + 5;
+      // Store transformed delete button center for hit detection
+      const hitPoint = this.transformLocalPoint(todoItem, deleteButtonX + 2, -deleteButtonSize / 2);
+      todoItem.deleteButtonCenterX = hitPoint.x;
+      todoItem.deleteButtonCenterY = hitPoint.y;
+      todoItem.deleteButtonHitRadius = 10;
+    } else {
+      todoItem.deleteButtonCenterX = null;
+      todoItem.deleteButtonCenterY = null;
+      todoItem.deleteButtonHitRadius = null;
     }
 
     // Draw strikethrough if completed
     if (todoItem.completed) {
       const textWidth = this.ctx.measureText(todoItem.text).width;
-      const strikeY = todoItem.y - 4;
       this.ctx.strokeStyle = '#000000';
       this.ctx.lineWidth = 1;
       this.ctx.beginPath();
-      this.ctx.moveTo(todoItem.x, strikeY);
-      this.ctx.lineTo(todoItem.x + textWidth, strikeY);
+      this.ctx.moveTo(0, -4);
+      this.ctx.lineTo(textWidth, -4);
       this.ctx.stroke();
     }
+    this.ctx.restore();
   }
 
   redrawTodoItems() {
@@ -1555,6 +1608,157 @@ class PaintManager {
     } catch (e) {
       console.error('Failed to clear schedule cache:', e);
     }
+  }
+
+  transformElements(transformType, oldWidth, oldHeight, newWidth, newHeight) {
+    const transformMatrix = (() => {
+      if (transformType === 'rotate90') return { a: 0, b: 1, c: -1, d: 0 };
+      if (transformType === 'mirror') return { a: -1, b: 0, c: 0, d: 1 };
+      if (transformType === 'flip') return { a: 1, b: 0, c: 0, d: -1 };
+      return { a: 1, b: 0, c: 0, d: 1 };
+    })();
+
+    const transformPoint = (x, y) => {
+      const maxX = Math.max(0, newWidth - 1);
+      const maxY = Math.max(0, newHeight - 1);
+      const clamp = (value, max) => Math.max(0, Math.min(value, max));
+      let mapped;
+      if (transformType === 'rotate90') {
+        mapped = { x: oldHeight - 1 - y, y: x };
+      } else if (transformType === 'mirror') {
+        mapped = { x: oldWidth - 1 - x, y: y };
+      } else if (transformType === 'flip') {
+        mapped = { x: x, y: oldHeight - 1 - y };
+      } else {
+        mapped = { x, y };
+      }
+      return {
+        x: clamp(mapped.x, maxX),
+        y: clamp(mapped.y, maxY)
+      };
+    };
+
+    const multiplyMatrix = (m1, m2) => {
+      return {
+        a: m1.a * m2.a + m1.c * m2.b,
+        b: m1.b * m2.a + m1.d * m2.b,
+        c: m1.a * m2.c + m1.c * m2.d,
+        d: m1.b * m2.c + m1.d * m2.d
+      };
+    };
+
+    const originalSelectedTextElement = this.selectedTextElement;
+    const originalSelectedEditingText = this.selectedEditingText;
+    const originalSelectedTodoItem = this.selectedTodoItem;
+    const textElementMap = new Map();
+    const todoItemMap = new Map();
+
+    this.textElements = this.textElements.map((item) => {
+      const p = transformPoint(item.x, item.y);
+      const currentMatrix = this.getItemTransformMatrix(item);
+      const transformedMatrix = multiplyMatrix(transformMatrix, currentMatrix);
+      const transformed = { ...item, x: p.x, y: p.y, ...transformedMatrix };
+      textElementMap.set(item, transformed);
+      return transformed;
+    });
+
+    this.todoItems = this.todoItems.map((item) => {
+      const p = transformPoint(item.x, item.y);
+      const currentMatrix = this.getItemTransformMatrix(item);
+      const transformedMatrix = multiplyMatrix(transformMatrix, currentMatrix);
+      const transformed = {
+        ...item,
+        x: p.x,
+        y: p.y,
+        ...transformedMatrix,
+        deleteButtonCenterX: null,
+        deleteButtonCenterY: null,
+        deleteButtonHitRadius: null
+      };
+      todoItemMap.set(item, transformed);
+      return transformed;
+    });
+
+    this.lineSegments = this.lineSegments.map((segment) => {
+      if (segment.type === 'dot') {
+        const p = transformPoint(segment.x, segment.y);
+        return { ...segment, x: p.x, y: p.y };
+      }
+      const p1 = transformPoint(segment.x1, segment.y1);
+      const p2 = transformPoint(segment.x2, segment.y2);
+      return { ...segment, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+    });
+
+    if (this.scheduleData) {
+      const oldRows = this.scheduleData.length;
+      const oldCols = this.scheduleData[0].length;
+      const oldTableWidth = oldCols * this.scheduleCellWidth;
+      const oldTableHeight = oldRows * this.scheduleCellHeight;
+
+      const mapScheduleCell = (row, col) => {
+        if (transformType === 'rotate90') {
+          return { row: col, col: oldRows - 1 - row };
+        }
+        if (transformType === 'mirror') {
+          return { row, col: oldCols - 1 - col };
+        }
+        if (transformType === 'flip') {
+          return { row: oldRows - 1 - row, col };
+        }
+        return { row, col };
+      };
+
+      const newRows = transformType === 'rotate90' ? oldCols : oldRows;
+      const newCols = transformType === 'rotate90' ? oldRows : oldCols;
+      const newScheduleData = Array.from({ length: newRows }, () => Array(newCols).fill(''));
+      const newCellFontSizes = Array.from({ length: newRows }, () => Array(newCols).fill(this.scheduleFontSize));
+
+      for (let row = 0; row < oldRows; row++) {
+        for (let col = 0; col < oldCols; col++) {
+          const mapped = mapScheduleCell(row, col);
+          newScheduleData[mapped.row][mapped.col] = this.scheduleData[row][col];
+          if (this.scheduleCellFontSizes && this.scheduleCellFontSizes[row]) {
+            newCellFontSizes[mapped.row][mapped.col] = this.scheduleCellFontSizes[row][col];
+          }
+        }
+      }
+
+      this.scheduleData = newScheduleData;
+      this.scheduleCellFontSizes = newCellFontSizes;
+      this.scheduleClasses = newRows - 1;
+      this.scheduleDays = newCols - 1;
+
+      if (transformType === 'rotate90') {
+        const oldStartX = this.scheduleStartX;
+        const oldStartY = this.scheduleStartY;
+        const oldCellWidth = this.scheduleCellWidth;
+        const oldCellHeight = this.scheduleCellHeight;
+        this.scheduleCellWidth = oldCellHeight;
+        this.scheduleCellHeight = oldCellWidth;
+        this.scheduleStartX = oldHeight - (oldStartY + oldTableHeight);
+        this.scheduleStartY = oldStartX;
+      } else if (transformType === 'mirror') {
+        this.scheduleStartX = oldWidth - (this.scheduleStartX + oldTableWidth);
+      } else if (transformType === 'flip') {
+        this.scheduleStartY = oldHeight - (this.scheduleStartY + oldTableHeight);
+      }
+
+      if (this.selectedScheduleCell) {
+        const mapped = mapScheduleCell(this.selectedScheduleCell.row, this.selectedScheduleCell.col);
+        this.selectedScheduleCell = { row: mapped.row, col: mapped.col };
+      }
+
+      // Keep schedule in visible area after transforms.
+      const newTableWidth = newCols * this.scheduleCellWidth;
+      const newTableHeight = newRows * this.scheduleCellHeight;
+      this.scheduleStartX = Math.max(0, Math.min(this.scheduleStartX, newWidth - newTableWidth));
+      this.scheduleStartY = Math.max(0, Math.min(this.scheduleStartY, newHeight - newTableHeight));
+      this.saveScheduleToLocalStorage();
+    }
+
+    this.selectedTextElement = originalSelectedTextElement ? (textElementMap.get(originalSelectedTextElement) || null) : null;
+    this.selectedEditingText = originalSelectedEditingText ? (textElementMap.get(originalSelectedEditingText) || null) : null;
+    this.selectedTodoItem = originalSelectedTodoItem ? (todoItemMap.get(originalSelectedTodoItem) || null) : null;
   }
 
   clearElements() {

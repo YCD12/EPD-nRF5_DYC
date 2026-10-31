@@ -244,6 +244,10 @@ void UC81xx_Write_Ram(epd_model_t* epd, uint8_t cfg, uint8_t* data, uint8_t len)
     bool begin = (cfg >> 4) == 0x00;
     bool black = (cfg & 0x0F) == 0x0F;
     if (begin) {
+        // Reset the RAM window on the first block of every layer so the address
+        // counter starts at 0,0. Without this the second layer (DTM2 for BWR)
+        // starts wherever the first layer ended and lands in the wrong place.
+        _setPartialRamArea(epd, 0, 0, epd->width, epd->height);
         if (epd->color == BWR)
             EPD_WriteCmd(black ? UC81xx_DTM1 : UC81xx_DTM2);
         else
@@ -256,7 +260,10 @@ void UC81xx_Write_Ram(epd_model_t* epd, uint8_t cfg, uint8_t* data, uint8_t len)
 void UC81xx_Write_Ram_Native(epd_model_t* epd, uint8_t cfg, uint8_t* data, uint8_t len) {
     bool begin = (cfg >> 4) == 0x00;
     bool black = (cfg & 0x0F) == 0x0F;
-    if (begin && black) EPD_WriteCmd(UC81xx_DTM1);
+    if (begin) {
+        _setPartialRamArea(epd, 0, 0, epd->width, epd->height);
+        if (black) EPD_WriteCmd(UC81xx_DTM1);
+    }
     EPD_WriteData(data, len);
 }
 

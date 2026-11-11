@@ -7,7 +7,7 @@ import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { Cmd, frame, buildTimeData, hexToBytes, bytesToHex } from '../common/Protocol';
 import { BleClient, DeviceItem } from '../common/BleClient';
-import { processImage, ProcessOptions, convertUC8159, applyImageTone, ditherImage, packImage } from '../common/Dither';
+import { processImage, ProcessOptions, convertUC8159, applyImageTone, ditherImage, packImage, previewThreeColor } from '../common/Dither';
 import { RawImage, rotate90, mirrorH, mirrorV, fitToCanvas } from '../common/ImageOps';
 import { sendLayerCrc, sendLayerLegacy } from '../common/Transfer';
 
@@ -729,7 +729,9 @@ struct Index {
       editable: false
     };
     try {
-      this.preview = await image.createPixelMap(this.toDisplayBuffer(work.buffer as ArrayBuffer), initOpts);
+      const previewData: Uint8ClampedArray = mode === 'threeColor' && this.packed !== null
+        ? previewThreeColor(this.packed, this.canvasW, this.canvasH) : work;
+      this.preview = await image.createPixelMap(this.toDisplayBuffer(previewData.buffer as ArrayBuffer), initOpts);
     } catch (err) {
       this.log('预览生成失败');
     }

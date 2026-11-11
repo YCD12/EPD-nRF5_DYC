@@ -297,6 +297,27 @@ export function packImage(data: Uint8ClampedArray, width: number, height: number
   return null;
 }
 
+// Decode the actual two transmitted planes so preview and output share pixels.
+export function previewThreeColor(packed: Uint8Array, width: number, height: number): Uint8ClampedArray {
+  const stride: number = Math.ceil(width / 8);
+  const planeSize: number = stride * height;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let y: number = 0; y < height; y++) {
+    for (let x: number = 0; x < width; x++) {
+      const byteIndex: number = y * stride + Math.floor(x / 8);
+      const mask: number = 1 << (7 - x % 8);
+      const red: boolean = (packed[planeSize + byteIndex] & mask) === 0;
+      const white: boolean = (packed[byteIndex] & mask) !== 0;
+      const i: number = (y * width + x) * 4;
+      rgba[i] = red || white ? 255 : 0;
+      rgba[i + 1] = !red && white ? 255 : 0;
+      rgba[i + 2] = !red && white ? 255 : 0;
+      rgba[i + 3] = 255;
+    }
+  }
+  return rgba;
+}
+
 export function convertUC8159(blackWhiteData: Uint8Array, redWhiteData: Uint8Array): Uint8Array {
   const halfLength: number = blackWhiteData.length;
   const out = new Uint8Array(halfLength * 4);

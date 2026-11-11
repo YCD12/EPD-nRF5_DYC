@@ -2,146 +2,112 @@
 
 #include <string.h>
 
+#include "app_scheduler.h"
+#include "fds.h"
 #include "nordic_common.h"
-#include "nrf_soc.h"
-#include "nrf_sdh_soc.h"
 #include "nrf_log.h"
 
-// The bootloader reserves 8 KB at the top of the DFU region for application
-// data (NRF_DFU_APP_DATA_AREA_SIZE). Use its first page for the config so the
-// app never collides with the bootloader and does not need the FDS stack.
-#define CONFIG_PAGE_ADDR 0x27000UL
-#define CONFIG_PAGE_SIZE 4096UL
+#define CONFIG_FILE_ID 0x0000
+#define CONFIG_REC_KEY 0x0001
 
-#define CONFIG_MAGIC 0x45504443UL  // "EPDC"
-
-typedef struct {
-    uint32_t magic;
-    epd_config_t cfg;
-} config_record_t;
-
-#define CONFIG_WORDS ((sizeof(config_record_t) + 3) / 4)
-
-static config_record_t m_rec __attribute__((aligned(4)));
-static config_record_t m_inflight __attribute__((aligned(4)));
-static volatile uint8_t m_state = 0;  // 0 idle, 1 erasing, 2 writing
-static volatile bool m_pending = false;
-
-static void config_write_start(void) {
-    if (m_state != 0) {
-        m_pending = true;
-        return;
-    }
-    // SoftDevice owns this immutable snapshot until write completion.
-    m_inflight = m_rec;
-    m_state = 1;
-    ret_code_t err = sd_flash_page_erase(CONFIG_PAGE_ADDR / CONFIG_PAGE_SIZE);
-    if (err != NRF_SUCCESS) {
-        NRF_LOG_ERROR("config erase failed code=%d\n", err);
-        m_state = 0;
-    }
+static void fds_evt_handler(fds_evt_t const* const p_fds_evt) {
+    NRF_LOG_DEBUG("fds evt: id=%d result=%d\n", p_fds_evt->id, p_fds_evt->result);
 }
 
-static void config_soc_observer(uint32_t sys_evt, void* p_context) {
-    UNUSED_PARAMETER(p_context);
-    if (sys_evt == NRF_EVT_FLASH_OPERATION_SUCCESS) {
-        if (m_state == 1) {
-            m_state = 2;
-            ret_code_t err = sd_flash_write((uint32_t*)CONFIG_PAGE_ADDR, (uint32_t*)&m_inflight, CONFIG_WORDS);
-            if (err != NRF_SUCCESS) {
-                NRF_LOG_ERROR("config write failed code=%d\n", err);
-                m_state = 0;
-            }
-        } else if (m_state == 2) {
-            m_state = 0;
-            if (m_pending) {
-                m_pending = false;
-                config_write_start();
-            }
-        }
-    } else if (sys_evt == NRF_EVT_FLASH_OPERATION_ERROR) {
-        NRF_LOG_ERROR("config flash op error\n");
-        m_state = 0;
-        if (m_pending) {
-            m_pending = false;
-            config_write_start();
-        }
-    }
+static void run_fds_gc(void* p_event_data, uint16_t event_size) {
+    NRF_LOG_DEBUG("run garbage collection (fds_gc)\n");
+    fds_gc();
 }
-
-NRF_SDH_SOC_OBSERVER(m_config_soc_obs, 1, config_soc_observer, NULL);
-
-static bool pin_valid(uint8_t pin) {
-    return pin <= 31;
-}
-
-static bool pin_optional(uint8_t pin) {
-    return pin == 0xFF || pin <= 31;
-}
-
-// Reject a stored config that cannot safely drive this panel. In particular,
-// a 4.2" model (1..5) on a 7.5" panel makes the SSD16xx driver wait up to
-// 30 s on the wrong BUSY polarity, blocking BLE event handling.
-static bool config_valid(const epd_config_t* cfg) {
-    if (!pin_valid(cfg->mosi_pin) || !pin_valid(cfg->sclk_pin) ||
-        !pin_valid(cfg->cs_pin) || !pin_valid(cfg->dc_pin) ||
-        !pin_valid(cfg->rst_pin) || !pin_valid(cfg->busy_pin) ||
-        !pin_optional(cfg->bs_pin)) {
-        return false;
-    }
-    if (!pin_optional(cfg->wakeup_pin) || !pin_optional(cfg->led_pin) ||
-        !pin_optional(cfg->en_pin)) {
-        return false;
-    }
-    if (cfg->model_id == 0 || cfg->model_id > 12) {
-        return false;
-    }
-    // This firmware targets 7.5" panels; never accept a 4.2" model.
-    if (cfg->model_id <= 5) {
-        return false;
-    }
-    if (cfg->display_mode > 2 || cfg->week_start > 6) {
-        return false;
-    }
-    return true;
-}
-
 
 void epd_config_init(epd_config_t* cfg) {
-    UNUSED_PARAMETER(cfg);
+    ret_code_t ret;
+
+    ret = fds_register(fds_evt_handler);
+    if (ret != NRF_SUCCESS) {
+        NRF_LOG_ERROR("fds_register failed, code=%d\n", ret);
+        return;
+    }
+
+    ret = fds_init();
+    if (ret != NRF_SUCCESS) {
+        NRF_LOG_ERROR("fds_init failed, code=%d\n", ret);
+        return;
+    }
+
+    run_fds_gc(NULL, 0);
 }
 
 void epd_config_read(epd_config_t* cfg) {
-    const config_record_t* rec = (const config_record_t*)CONFIG_PAGE_ADDR;
-    if (rec->magic != CONFIG_MAGIC) {
-        memset(cfg, 0xFF, sizeof(epd_config_t));
+    fds_flash_record_t flash_record;
+    fds_record_desc_t record_desc;
+    fds_find_token_t ftok;
+
+    memset(cfg, 0xFF, sizeof(epd_config_t));
+    memset(&ftok, 0x00, sizeof(fds_find_token_t));
+
+    if (fds_record_find(CONFIG_FILE_ID, CONFIG_REC_KEY, &record_desc, &ftok) != NRF_SUCCESS) {
+        NRF_LOG_DEBUG("epd_config_load: record not found\n");
         return;
     }
-    memcpy(cfg, &rec->cfg, sizeof(epd_config_t));
-    if (!config_valid(cfg)) {
-        NRF_LOG_WARNING("stored config invalid, using defaults\n");
-        memset(cfg, 0xFF, sizeof(epd_config_t));
+    if (fds_record_open(&record_desc, &flash_record) != NRF_SUCCESS) {
+        NRF_LOG_ERROR("epd_config_load: record open failed!");
+        return;
     }
+#ifdef S112
+    uint32_t record_len = flash_record.p_header->length_words * sizeof(uint32_t);
+#else
+    uint32_t record_len = flash_record.p_header->tl.length_words * sizeof(uint32_t);
+#endif
+    memcpy(cfg, flash_record.p_data, MIN(sizeof(epd_config_t), record_len));
+    fds_record_close(&record_desc);
 }
 
 void epd_config_write(epd_config_t* cfg) {
-    m_rec.magic = CONFIG_MAGIC;
-    memcpy(&m_rec.cfg, cfg, sizeof(epd_config_t));
-    if (m_state == 0) {
-        config_write_start();
-    } else {
-        m_pending = true;
+    ret_code_t ret;
+    fds_record_t record;
+    fds_record_desc_t record_desc;
+    fds_find_token_t ftok;
+
+    record.file_id = CONFIG_FILE_ID;
+    record.key = CONFIG_REC_KEY;
+#ifdef S112
+    record.data.p_data = (void*)cfg;
+    record.data.length_words = BYTES_TO_WORDS(sizeof(epd_config_t));
+#else
+    fds_record_chunk_t record_chunk;
+    record_chunk.p_data = cfg;
+    record_chunk.length_words = BYTES_TO_WORDS(sizeof(epd_config_t));
+    record.data.p_chunks = &record_chunk;
+    record.data.num_chunks = 1;
+#endif
+
+    memset(&ftok, 0x00, sizeof(fds_find_token_t));
+    ret = fds_record_find(CONFIG_FILE_ID, CONFIG_REC_KEY, &record_desc, &ftok);
+    if (ret == NRF_SUCCESS)
+        ret = fds_record_update(&record_desc, &record);
+    else
+        ret = fds_record_write(&record_desc, &record);
+
+    if (ret != NRF_SUCCESS) {
+        NRF_LOG_ERROR("epd_config_save: record write/update failed, code=%d\n", ret);
+        if (ret == FDS_ERR_NO_SPACE_IN_FLASH) app_sched_event_put(NULL, 0, run_fds_gc);
     }
 }
 
 void epd_config_clear(epd_config_t* cfg) {
-    memset(cfg, 0xFF, sizeof(epd_config_t));
-    m_rec.magic = CONFIG_MAGIC;
-    memcpy(&m_rec.cfg, cfg, sizeof(epd_config_t));
-    if (m_state == 0) {
-        config_write_start();
-    } else {
-        m_pending = true;
+    ret_code_t ret;
+    fds_record_desc_t record_desc;
+    fds_find_token_t ftok;
+
+    memset(&ftok, 0x00, sizeof(fds_find_token_t));
+    if (fds_record_find(CONFIG_FILE_ID, CONFIG_REC_KEY, &record_desc, &ftok) != NRF_SUCCESS) {
+        NRF_LOG_DEBUG("epd_config_clear: record not found\n");
+        return;
+    }
+
+    ret = fds_record_delete(&record_desc);
+    if (ret != NRF_SUCCESS) {
+        NRF_LOG_ERROR("fds_record_delete failed, code=%d\n", ret);
     }
 }
 

@@ -3,7 +3,6 @@
 ## 1. Release 资产
 
 - `EPDConsole-unsigned.hap`：未签名的 HarmonyOS 应用包。
-- `EPD-nRF52-7.5-ota*.zip`：配套固件（当前 0x26，仅限 7.5 寸三色，驱动 07）。
 - `SHA256SUMS.txt`：以上文件的校验值。
 
 仓库和 Release **不包含任何私钥、证书或 profile**。

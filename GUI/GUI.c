@@ -141,31 +141,17 @@ static void DrawBattery(Adafruit_GFX* gfx, int16_t x, int16_t y, uint8_t iw, flo
     GFX_fillRect(gfx, x + 2, y + 2, 16 * level / 100, 6, GFX_BLACK);
 }
 
-static int32_t days_from_civil(int y, unsigned m, unsigned d) {
-    y -= m <= 2;
-    const int era = (y >= 0 ? y : y - 399) / 400;
-    const unsigned yoe = (unsigned)(y - era * 400);
-    const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    return (int32_t)era * 146097 + (int32_t)doe - 719468;
-}
-
-// ISO-8601 week number without strftime/timezone support.
 static uint8_t GetWeekOfYear(uint8_t year, uint8_t mon, uint8_t mday, uint8_t wday) {
-    (void)wday;
-    int y = (int)year + 1900;
-    int m = (int)mon + 1;
-    int32_t days = days_from_civil(y, m, mday);
-    int32_t monday_wd = (days + 3) % 7;
-    if (monday_wd < 0) monday_wd += 7;
-    int32_t thursday = days + (3 - monday_wd);
-    int ty = y;
-    if (thursday < days_from_civil(y, 1, 1)) {
-        ty = y - 1;
-    } else if (thursday >= days_from_civil(y + 1, 1, 1)) {
-        ty = y + 1;
-    }
-    return (uint8_t)((thursday - days_from_civil(ty, 1, 1)) / 7 + 1);
+    struct tm tm = {0};
+    tm.tm_year = year;
+    tm.tm_mon = mon;
+    tm.tm_mday = mday;
+    tm.tm_wday = wday;
+    tm.tm_isdst = -1;
+    mktime(&tm);
+    char buffer[3] = {0};
+    strftime(buffer, 3, "%V", &tm);
+    return atoi(buffer);
 }
 
 static void DrawDateHeader(Adafruit_GFX* gfx, int16_t x, int16_t y, tm_t* tm, struct Lunar_Date* Lunar,

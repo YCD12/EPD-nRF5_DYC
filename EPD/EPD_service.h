@@ -42,7 +42,7 @@ void ble_epd_evt_handler(ble_evt_t const* p_ble_evt, void* p_context);
 #define BLE_EPD_DEF(_name) static ble_epd_t _name;
 #endif
 
-#define APP_VERSION 0x27
+#define APP_VERSION 0x20
 
 #define BLE_UUID_EPD_SVC_BASE \
     {{0XEC, 0X5A, 0X67, 0X1C, 0XC1, 0XB6, 0X46, 0XFB, 0X8D, 0X91, 0X28, 0XD8, 0X22, 0X36, 0X75, 0X62}}
@@ -78,25 +78,15 @@ enum EPD_CMDS {
     EPD_CMD_QUERY_STATUS   = 0x32,   /**< query transfer status */
     EPD_CMD_RESET_TRANSFER = 0x33,   /**< reset transfer state */
 
-    EPD_CMD_SET_LINK_STATE = 0x70, /**< set host link state (idle/hold/transfer) */
-
     EPD_CMD_SET_CONFIG = 0x90, /**< set full EPD config */
     EPD_CMD_SYS_RESET = 0x91,  /**< MCU reset */
     EPD_CMD_SYS_SLEEP = 0x92,  /**< MCU enter sleep mode */
     EPD_CMD_CFG_ERASE = 0x99,  /**< Erase config and reset */
 };
 
-/**< Host link state, must match the App's LinkState. */
-typedef enum {
-    EPD_LINK_IDLE = 0x00,     /**< Host left / session closed. */
-    EPD_LINK_HOLD = 0x01,     /**< Connected and kept alive by the host. */
-    EPD_LINK_TRANSFER = 0x02, /**< Host is uploading an image or firmware. */
-} epd_link_state_t;
-
 // Response types for CRC transfer
 #define EPD_RSP_BLOCK_ACK       0xA0  // Block ACK/NACK response
 #define EPD_RSP_STATUS          0xA1  // Status response
-#define EPD_RSP_LINK_STATE      0xB0  // Link state acknowledgement: [0xB0, state]
 
 // Transfer configuration
 #define EPD_MAX_BLOCKS          512   // Maximum blocks (96KB / 192B)
@@ -129,7 +119,6 @@ typedef struct {
     epd_model_t* epd;             /**< current EPD model */
     epd_config_t config;          /**< EPD config */
     image_transfer_ctx_t transfer_ctx; /**< Image transfer context for CRC and resume */
-    uint8_t link_state;           /**< Host link state (EPD_LINK_*). */
 } ble_epd_t;
 
 typedef struct {

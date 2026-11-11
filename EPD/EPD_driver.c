@@ -7,8 +7,6 @@
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define BUFFER_SIZE 128
 
-extern void app_feed_wdt(void);
-
 // GPIO Pins
 static uint32_t EPD_MOSI_PIN = 5;
 static uint32_t EPD_SCLK_PIN = 8;
@@ -203,7 +201,6 @@ void EPD_WaitBusy(uint32_t value, uint16_t timeout) {
 
     NRF_LOG_DEBUG("[EPD]: check busy\n");
     while (digitalRead(EPD_BUSY_PIN) == value) {
-        app_feed_wdt();
         if (timeout % 100 == 0) EPD_LED_Toggle();
         delay(1);
         timeout--;

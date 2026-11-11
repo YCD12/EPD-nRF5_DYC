@@ -24,7 +24,7 @@
 #include "sdk_macros.h"
 
 #if defined(S112)
-#define EPD_CFG_52811 {0x14, 0x13, 0x06, 0x05, 0x04, 0x03, 0x02, 0x07, 0xFF, 0x12, 0x07}
+#define EPD_CFG_52811 {0x14, 0x13, 0x06, 0x05, 0x04, 0x03, 0x02, 0x02, 0xFF, 0x12, 0x07}
 #define EPD_CFG_52810 {0x14, 0x13, 0x12, 0x11, 0x10, 0x0F, 0x0E, 0x02, 0xFF, 0x0D, 0x02}
 #else
 #define EPD_CFG_DEFAULT {0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x03, 0x09, 0x03}
@@ -66,8 +66,6 @@ static void epd_gui_update(void* p_event_data, uint16_t event_size) {
  */
 static void on_connect(ble_epd_t* p_epd, ble_evt_t* p_ble_evt) {
     p_epd->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-    p_epd->link_state = EPD_LINK_HOLD;
-    NRF_LOG_INFO("[EPD]: link state -> HOLD\n");
     EPD_GPIO_Init();
 }
 
@@ -79,28 +77,15 @@ static void on_connect(ble_epd_t* p_epd, ble_evt_t* p_ble_evt) {
 static void on_disconnect(ble_epd_t* p_epd, ble_evt_t* p_ble_evt) {
     UNUSED_PARAMETER(p_ble_evt);
     p_epd->conn_handle = BLE_CONN_HANDLE_INVALID;
-    p_epd->link_state = EPD_LINK_IDLE;
-    p_epd->transfer_ctx.transfer_active = false;
-    NRF_LOG_INFO("[EPD]: link state -> IDLE\n");
-    if (p_epd->epd != NULL) {
-        p_epd->epd->drv->sleep(p_epd->epd);
-        nrf_delay_ms(200);  // for sleep
-    }
+    p_epd->epd->drv->sleep(p_epd->epd);
+    nrf_delay_ms(200);  // for sleep
     EPD_GPIO_Uninit();
 }
 
-extern void app_clock_timer_set_enabled(bool enable);
-extern void app_adv_mode_update(void);
-
 static void epd_update_display_mode(ble_epd_t* p_epd, display_mode_t mode) {
-    bool changed = (p_epd->config.display_mode != mode);
-    if (changed) {
+    if (p_epd->config.display_mode != mode) {
         p_epd->config.display_mode = mode;
         epd_config_write(&p_epd->config);
-    }
-    app_clock_timer_set_enabled(mode != MODE_PICTURE);
-    if (changed) {
-        app_adv_mode_update();
     }
 }
 
@@ -335,23 +320,6 @@ static void epd_service_on_write(ble_epd_t* p_epd, uint8_t* p_data, uint16_t len
             p_epd->transfer_ctx.transfer_active = false;
             break;
 
-        case EPD_CMD_SET_LINK_STATE: {
-            if (length < 2) return;
-            uint8_t st = p_data[1];
-            if (st > EPD_LINK_TRANSFER) {
-                st = EPD_LINK_IDLE;
-            }
-            p_epd->link_state = st;
-            if (st == EPD_LINK_IDLE) {
-                // Session closed: drop any in-flight image transfer.
-                p_epd->transfer_ctx.transfer_active = false;
-            }
-            uint8_t rsp[2] = {EPD_RSP_LINK_STATE, st};
-            ble_epd_string_send(p_epd, rsp, 2);
-            NRF_LOG_INFO("[EPD]: link state -> %d\n", st);
-            break;
-        }
-
         case EPD_CMD_SET_CONFIG:
             if (length < 2) return;
             memcpy(&p_epd->config, &p_data[1], (length - 1 > EPD_CONFIG_SIZE) ? EPD_CONFIG_SIZE : length - 1);
@@ -359,9 +327,7 @@ static void epd_service_on_write(ble_epd_t* p_epd, uint8_t* p_data, uint16_t len
             break;
 
         case EPD_CMD_SYS_SLEEP:
-            // This 7.5-inch target has no verified wake source; never enter
-            // System OFF from a reachable BLE command.
-            NRF_LOG_WARNING("[EPD]: SYS_SLEEP disabled (no verified wake source)\n");
+            sleep_mode_enter();
             break;
 
         case EPD_CMD_SYS_RESET:
@@ -497,7 +463,6 @@ uint32_t ble_epd_init(ble_epd_t* p_epd) {
     p_epd->max_data_len = BLE_EPD_MAX_DATA_LEN;
     p_epd->conn_handle = BLE_CONN_HANDLE_INVALID;
     p_epd->is_notification_enabled = false;
-    p_epd->link_state = EPD_LINK_IDLE;
 
     // Initialize transfer context
     memset(&p_epd->transfer_ctx, 0, sizeof(image_transfer_ctx_t));

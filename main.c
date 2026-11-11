@@ -52,10 +52,8 @@
 #define PERIPHERAL_LINK_COUNT           1                                               /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
 #define DEVICE_NAME                      "NRF_EPD"                                      /**< Name of device. Will be included in the advertising data. */
-#define APP_ADV_INTERVAL                 3200                                           /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1 s). */
-#define APP_ADV_TIMEOUT_IN_SECONDS       0                                            /**< The advertising timeout (in units of seconds). */
-#define ADV_WINDOW_MS                    2000                                         /**< Picture-mode advertising window. */
-#define ADV_PERIOD_MS                    60000                                        /**< Picture-mode advertising period. */
+#define APP_ADV_INTERVAL                 1600                                           /**< The advertising interval (in units of 0.625 ms. This value corresponds to 1 s). */
+#define APP_ADV_TIMEOUT_IN_SECONDS       120                                            /**< The advertising timeout (in units of seconds). */
 #define APP_TIMER_PRESCALER              0                                              /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE          4                                              /**< Size of timer operation queues. */
 
@@ -100,9 +98,8 @@ static ble_uuid_t                        m_adv_uuids[] = {{BLE_UUID_EPD_SVC, \
 BLE_EPD_DEF(m_epd);                                                                     /**< Structure to identify the EPD Service. */
 static uint32_t                          m_timestamp = 1735689600;                      /**< Current timestamp. */
 APP_TIMER_DEF(m_clock_timer_id);                                                        /**< Clock timer. */
-APP_TIMER_DEF(m_adv_window_timer_id);                                                   /**< Picture-mode advertising window timer. */
-static volatile bool                     m_adv_window_due = false;
 static nrf_drv_wdt_channel_id            m_wdt_channel_id;
+static uint32_t                          m_wdt_last_feed_time = 0;
 static uint32_t                          m_resetreas;
 // clang-format on
 
@@ -133,16 +130,11 @@ void set_timestamp(uint32_t timestamp) {
 
 // reload the wdt channel
 void app_feed_wdt(void) {
-    nrf_drv_wdt_channel_feed(m_wdt_channel_id);
-}
-
-static void adv_window_timeout_handler(void* p_context) {
-    UNUSED_PARAMETER(p_context);
-    m_adv_window_due = true;
-}
-
-static void schedule_adv_window(void) {
-    APP_ERROR_CHECK(app_timer_start(m_adv_window_timer_id, APP_TIMER_TICKS(ADV_PERIOD_MS - ADV_WINDOW_MS), NULL));
+    if (m_timestamp - m_wdt_last_feed_time >= 30) {
+        NRF_LOG_DEBUG("Feed WDT\n");
+        nrf_drv_wdt_channel_feed(m_wdt_channel_id);
+        m_wdt_last_feed_time = m_timestamp;
+    }
 }
 
 #if defined(S112)
@@ -151,8 +143,8 @@ static void buttonless_dfu_sdh_state_observer(nrf_sdh_state_evt_t state, void* p
         // Softdevice was disabled before going into reset. Inform bootloader to skip CRC on next boot.
         nrf_power_gpregret2_set(BOOTLOADER_DFU_SKIP_CRC);
 
-        // Enter the bootloader so DfuTarg starts advertising.
-        nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_DFU);
+        // Go to system off.
+        nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
     }
 }
 
@@ -165,11 +157,8 @@ static void advertising_config_get(ble_adv_modes_config_t* p_config) {
     memset(p_config, 0, sizeof(ble_adv_modes_config_t));
 
     p_config->ble_adv_fast_enabled = true;
-    p_config->ble_adv_on_disconnect_disabled = true;
-    p_config->ble_adv_fast_interval =
-        (m_epd.config.display_mode == MODE_PICTURE) ? 320 : APP_ADV_INTERVAL;
-    p_config->ble_adv_fast_timeout =
-        (m_epd.config.display_mode == MODE_PICTURE) ? (ADV_WINDOW_MS / 10) : (APP_ADV_TIMEOUT_IN_SECONDS * 100);
+    p_config->ble_adv_fast_interval = APP_ADV_INTERVAL;
+    p_config->ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS * 100;
 }
 
 static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event) {
@@ -255,7 +244,6 @@ static void timers_init(void) {
 #endif
     // Create timers.
     APP_ERROR_CHECK(app_timer_create(&m_clock_timer_id, APP_TIMER_MODE_REPEATED, clock_timer_timeout_handler));
-    APP_ERROR_CHECK(app_timer_create(&m_adv_window_timer_id, APP_TIMER_MODE_SINGLE_SHOT, adv_window_timeout_handler));
 }
 
 /**@brief Function for starting application timers.
@@ -385,27 +373,6 @@ static void advertising_start(void) {
 #endif
 }
 
-void app_clock_timer_set_enabled(bool enable) {
-    app_timer_stop(m_clock_timer_id);
-    if (enable) {
-        app_timer_start(m_clock_timer_id, CLOCK_TIMER_INTERVAL, NULL);
-    }
-}
-
-void app_adv_mode_update(void) {
-    ble_adv_modes_config_t config;
-    advertising_config_get(&config);
-    ble_advertising_modes_config_set(&m_advertising, &config);
-
-    app_timer_stop(m_adv_window_timer_id);
-    m_adv_window_due = false;
-
-    if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-        (void)sd_ble_gap_adv_stop(m_advertising.adv_handle);
-        advertising_start();
-    }
-}
-
 void gpiote_evt_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
     NRF_LOG_DEBUG("pin: %d, event: %d\n", pin, action);
 
@@ -440,11 +407,11 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
             break;
         case BLE_ADV_EVT_IDLE:
             NRF_LOG_INFO("advertising timeout\n");
-            if (m_conn_handle != BLE_CONN_HANDLE_INVALID) {
-                break;
-            }
-            if (m_epd.config.display_mode == MODE_PICTURE) {
-                schedule_adv_window();
+            if (m_epd.config.wakeup_pin != 0xFF) {
+                if (m_epd.config.display_mode == MODE_PICTURE)
+                    sleep_mode_enter();
+                else
+                    setup_wakeup_pin(m_epd.config.wakeup_pin);
             } else {
                 advertising_start();
             }
@@ -463,18 +430,14 @@ static void on_ble_evt(ble_evt_t* p_ble_evt) {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("CONNECTED\n");
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            app_timer_stop(m_adv_window_timer_id);
-            m_adv_window_due = false;
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("DISCONNECTED\n");
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
-            if (m_epd.config.display_mode == MODE_PICTURE) {
-                schedule_adv_window();
-            } else {
-                advertising_start();
-            }
+#if !defined(S112)
+            advertising_start();
+#endif
             break;
 #if defined(S112)
         case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
@@ -648,17 +611,14 @@ static void advertising_init(void) {
 
     init.advdata.name_type = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
-    init.advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
+    init.advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
 
     init.srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     init.srdata.uuids_complete.p_uuids = m_adv_uuids;
 
     init.config.ble_adv_fast_enabled = true;
-    init.config.ble_adv_on_disconnect_disabled = true;
-    init.config.ble_adv_fast_interval =
-        (m_epd.config.display_mode == MODE_PICTURE) ? 320 : APP_ADV_INTERVAL;
-    init.config.ble_adv_fast_timeout =
-        (m_epd.config.display_mode == MODE_PICTURE) ? (ADV_WINDOW_MS / 10) : (APP_ADV_TIMEOUT_IN_SECONDS * 100);
+    init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
+    init.config.ble_adv_fast_timeout = APP_ADV_TIMEOUT_IN_SECONDS * 100;
     init.evt_handler = on_adv_evt;
 
     APP_ERROR_CHECK(ble_advertising_init(&m_advertising, &init));
@@ -714,13 +674,6 @@ static void power_management_init(void) {
 static void idle_state_handle(void) {
     app_feed_wdt();
 
-    if (m_adv_window_due) {
-        m_adv_window_due = false;
-        if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-            advertising_start();
-        }
-    }
-
     if (NRF_LOG_PROCESS() == false) nrf_pwr_mgmt_run();
 }
 
@@ -771,7 +724,6 @@ int main(void) {
 
     // Start execution.
     application_timers_start();
-    app_clock_timer_set_enabled(m_epd.config.display_mode != MODE_PICTURE);
 
     advertising_start();
 
